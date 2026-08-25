@@ -2,17 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VocalScore</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VocalScore v2</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <style>
 body{font-family:Inter,system-ui,sans-serif}.page{animation:fade .15s ease}
 @keyframes fade{from{opacity:.3;transform:translateY(3px)}to{opacity:1;transform:none}}
+.modal-bg{background:rgba(15,23,42,.55)}
 </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
-<div id="toast" class="fixed right-4 top-4 z-50 space-y-2"></div>
+
+<div id="toast" class="fixed right-4 top-4 z-[100] space-y-2"></div>
 
 <section id="login" class="min-h-screen bg-slate-950 flex items-center justify-center p-6">
   <div class="w-full max-w-md">
@@ -22,12 +24,13 @@ body{font-family:Inter,system-ui,sans-serif}.page{animation:fade .15s ease}
       <p class="mt-2 text-slate-400">Digital Vocal Competition Judging System</p>
     </div>
     <div class="bg-white rounded-2xl p-7 shadow-2xl">
-      <h2 class="text-xl font-semibold">Judge Login</h2>
-      <label class="block mt-6 text-sm font-medium">Judge ID</label>
-      <input id="judgeId" value="J01" class="mt-2 w-full rounded-xl border px-4 py-3">
+      <h2 class="text-xl font-semibold">Login</h2>
+      <label class="block mt-6 text-sm font-medium">User ID</label>
+      <input id="loginId" value="J01" class="mt-2 w-full rounded-xl border px-4 py-3">
       <label class="block mt-4 text-sm font-medium">PIN</label>
-      <input id="pin" type="password" value="1234" class="mt-2 w-full rounded-xl border px-4 py-3">
+      <input id="loginPin" type="password" value="1234" class="mt-2 w-full rounded-xl border px-4 py-3">
       <button onclick="login()" class="mt-6 w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white">Login</button>
+      <p class="text-center text-xs text-slate-400 mt-4">Admin default: ADMIN01 / 1234</p>
     </div>
   </div>
 </section>
@@ -37,10 +40,10 @@ body{font-family:Inter,system-ui,sans-serif}.page{animation:fade .15s ease}
   <div class="h-full flex flex-col">
     <div class="p-5 border-b border-white/10 flex items-center gap-3">
       <div class="h-11 w-11 rounded-xl bg-indigo-600 flex items-center justify-center"><i data-lucide="mic-2"></i></div>
-      <div><b>VocalScore</b><div class="text-xs text-slate-400">Digital Judging System</div></div>
+      <div><b>VocalScore</b><div class="text-xs text-slate-400" id="roleLabel">Digital Judging System</div></div>
     </div>
-    <nav id="nav" class="p-3 flex-1"></nav>
-    <div class="p-4 border-t border-white/10 text-sm">Judge 01 <span class="float-right text-emerald-400">Online</span></div>
+    <nav id="nav" class="p-3 flex-1 overflow-y-auto"></nav>
+    <div class="p-4 border-t border-white/10 text-sm"><span id="userLabel"></span><button onclick="logout()" class="float-right text-slate-400 hover:text-white">Logout</button></div>
   </div>
 </aside>
 
@@ -53,130 +56,134 @@ body{font-family:Inter,system-ui,sans-serif}.page{animation:fade .15s ease}
 </div>
 </section>
 
+<div id="modal" class="hidden fixed inset-0 z-[90] modal-bg items-center justify-center p-4">
+  <div id="modalBox" class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"></div>
+</div>
+
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzcXZdfN65nUdAyCHWPddvn1-H0HRtoxf2uly3pJGFoTjN5OlQrMc4fJFfZSHKH7vov/exec';
-const state={page:'dashboard',judgeId:'J01',participants:[],scores:[]};
+const GAS_URL='https://script.google.com/macros/s/AKfycbzcXZdfN65nUdAyCHWPddvn1-H0HRtoxf2uly3pJGFoTjN5OlQrMc4fJFfZSHKH7vov/exec';
+const state={user:null,page:'dashboard',participants:[],scores:[],judges:[]};
 
-function gas(action, params, done){
-  const cb='vocalScoreCallback_'+Date.now()+'_'+Math.floor(Math.random()*10000);
-  const script=document.createElement('script');
-  let finished=false;
-  const cleanup=()=>{try{delete window[cb]}catch(e){};script.remove()};
-  const timer=setTimeout(()=>{if(finished)return;finished=true;cleanup();done({success:false,message:'GAS request timed out.'})},12000);
-
-  window[cb]=(data)=>{
-    if(finished)return;
-    finished=true;clearTimeout(timer);cleanup();done(data);
-  };
-
-  script.onerror=()=>{
-    if(finished)return;
-    finished=true;clearTimeout(timer);cleanup();
-    done({success:false,message:'Unable to reach VocalScore Server.'});
-  };
-
+function gas(action,params,done){
+  const cb='vs_'+Date.now()+'_'+Math.floor(Math.random()*9999),s=document.createElement('script');
+  let ended=false;
+  const clean=()=>{try{delete window[cb]}catch(e){};s.remove()};
+  const timer=setTimeout(()=>{if(ended)return;ended=true;clean();done({success:false,message:'GAS request timed out.'})},12000);
+  window[cb]=d=>{if(ended)return;ended=true;clearTimeout(timer);clean();done(d)};
+  s.onerror=()=>{if(ended)return;ended=true;clearTimeout(timer);clean();done({success:false,message:'Unable to reach VocalScore Server.'})};
   const q=new URLSearchParams({action,callback:cb});
   Object.entries(params||{}).forEach(([k,v])=>q.set(k,v??''));
-  script.src=GAS_URL+'?'+q.toString();
-  document.body.appendChild(script);
+  s.src=GAS_URL+'?'+q.toString();document.body.appendChild(s);
 }
-
 function login(){
-  if(document.getElementById('pin').value!=='1234'){toast('Invalid PIN','error');return}
-  state.judgeId=document.getElementById('judgeId').value.trim()||'J01';
-  document.getElementById('login').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  nav();go('dashboard');loadData();
+  gas('login',{userId:document.getElementById('loginId').value.trim(),pin:document.getElementById('loginPin').value},d=>{
+    if(!d.success){toast(d.message,'error');return}
+    state.user=d.user;
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('roleLabel').textContent=d.user.role==='ADMIN'?'Administrator':'Judge Portal';
+    document.getElementById('userLabel').textContent=d.user.name+' · '+d.user.role;
+    nav();go('dashboard');loadData();
+  });
 }
-
+function logout(){location.reload()}
 function loadData(){
   setStatus('Connecting...','amber');
-  gas('participants',{},p=>{
+  gas('participants',{userId:state.user.id},p=>{
     if(!p.success){setStatus('Server Error','red');toast(p.message,'error');return}
-    state.participants=(p.participants||[]).map(x=>({
-      id:String(x.ParticipantID||''),bib:String(x.BIB||''),name:String(x.Name||''),
-      category:String(x.Category||''),status:'pending'
-    }));
-
-    gas('scores',{judgeId:state.judgeId},s=>{
-      state.scores=s.success?(s.scores||[]):[];
-      state.participants.forEach(p=>{if(state.scores.some(x=>String(x.participantId)===p.id))p.status='completed'});
-      setStatus('Server Connected','green');render();
+    state.participants=(p.participants||[]).map(x=>({id:String(x.ParticipantID||''),bib:String(x.BIB||''),name:String(x.Name||''),category:String(x.Category||''),status:'pending'}));
+    gas('scores',{userId:state.user.id},s=>{
+      if(!s.success){setStatus('Server Error','red');toast(s.message,'error');return}
+      state.scores=s.scores||[];
+      state.participants.forEach(p=>{const x=state.scores.find(s=>String(s.participantId)===p.id);if(x&&x.locked)p.status='locked';else if(x)p.status='saved'});
+      if(state.user.role==='ADMIN') gas('judges',{userId:state.user.id},j=>{state.judges=j.success?(j.judges||[]):[];setStatus('Server Connected','green');render()});
+      else {setStatus('Server Connected','green');render()}
     });
   });
 }
-
-function setStatus(t,c){
-  const e=document.getElementById('status');
-  e.textContent=t;
-  e.className='text-xs rounded-full px-3 py-1 '+(c==='green'?'bg-emerald-50 text-emerald-700':c==='red'?'bg-red-50 text-red-700':'bg-amber-50 text-amber-700');
-}
-
-const groups=[
+function setStatus(t,c){const e=document.getElementById('status');e.textContent=t;e.className='text-xs rounded-full px-3 py-1 '+(c==='green'?'bg-emerald-50 text-emerald-700':c==='red'?'bg-red-50 text-red-700':'bg-amber-50 text-amber-700')}
+const judgeGroups=[
  ['MAIN',[['dashboard','Dashboard','layout-dashboard']]],
- ['COMPETITION',[['participants','Participants','users'],['events','Events','calendar-days'],['judges','Judges','gavel']]],
- ['JUDGING',[['judging','Judging','clipboard-pen-line'],['scores','Score Records','file-check-2']]],
- ['RESULTS',[['results','Results','trophy'],['ranking','Ranking','medal'],['analytics','Analytics','chart-column']]]
+ ['JUDGING',[['participants','Participants','users'],['judging','Judging','clipboard-pen-line'],['scores','My Scores','file-check-2']]]
 ];
-
+const adminGroups=[
+ ['MAIN',[['dashboard','Dashboard','layout-dashboard']]],
+ ['LIVE',[['live','Live Scores','activity'],['results','Ranking','trophy']]],
+ ['MANAGEMENT',[['participants','Participants','users'],['judges','Judges','gavel'],['criteria','Criteria','sliders-horizontal'],['settings','Settings','settings']]]
+];
 function nav(){
- document.getElementById('nav').innerHTML=groups.map(([g,items])=>`
- <div class="mt-5 mb-2 px-3 text-[11px] uppercase tracking-widest text-slate-500">${g}</div>
- ${items.map(([id,label,ico])=>`<button onclick="go('${id}')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm ${state.page===id?'bg-indigo-600':'text-slate-300 hover:bg-white/5'}">${icon(ico)}${label}</button>`).join('')}`).join('');
+ const groups=state.user?.role==='ADMIN'?adminGroups:judgeGroups;
+ document.getElementById('nav').innerHTML=groups.map(([g,items])=>`<div class="mt-5 mb-2 px-3 text-[11px] uppercase tracking-widest text-slate-500">${g}</div>${items.map(([id,l,i])=>`<button onclick="go('${id}')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm ${state.page===id?'bg-indigo-600':'text-slate-300 hover:bg-white/5'}">${icon(i)}${l}</button>`).join('')}`).join('');
  lucide.createIcons();
 }
-function icon(x){return `<i data-lucide="${x}" class="h-5 w-5"></i>`}
+function icon(n){return `<i data-lucide="${n}" class="h-5 w-5"></i>`}
 function go(p){state.page=p;nav();render();document.getElementById('side').classList.add('-translate-x-full')}
 function header(a,b){return `<div class="mb-6"><h1 class="text-2xl font-bold">${a}</h1><p class="text-sm text-slate-500 mt-1">${b}</p></div>`}
-function render(){
- const f={dashboard,participants,judging,scores,events,judges,results,ranking,analytics};
- document.getElementById('main').innerHTML='<div class="page">'+f[state.page]()+'</div>';
- lucide.createIcons();
-}
-function card(a,b,c){return `<div class="bg-white border rounded-2xl p-5 shadow-sm"><p class="text-sm text-slate-500">${a}</p><p class="text-3xl font-bold mt-2">${b}</p></div>`}
+function render(){const f={dashboard,participants,judging,scores,live,results,judges,criteria,settings};document.getElementById('main').innerHTML='<div class="page">'+(f[state.page]||dashboard)()+'</div>';lucide.createIcons()}
 function dashboard(){
- const done=state.participants.filter(p=>p.status==='completed').length;
- return header('Dashboard','Welcome back, Judge 01.')+`<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">${card('Participants',state.participants.length)}${card('Completed',done)}${card('Pending',state.participants.length-done)}${card('Scores',state.scores.length)}</div>`;
+ if(state.user.role==='ADMIN')return header('Admin Dashboard','Live competition control centre.')+`<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">${card('Participants',state.participants.length)}${card('Judges',state.judges.length)}${card('Locked Scores',state.scores.filter(s=>s.locked).length)}${card('Total Scores',state.scores.length)}</div>`;
+ const done=state.participants.filter(p=>p.status==='locked').length;
+ return header('Judge Dashboard','Enter and lock your scores.')+`<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">${card('Participants',state.participants.length)}${card('Locked',done)}${card('Pending',state.participants.length-done)}</div>`;
 }
+function card(a,b){return `<div class="bg-white border rounded-2xl p-5 shadow-sm"><p class="text-sm text-slate-500">${a}</p><p class="text-3xl font-bold mt-2">${b}</p></div>`}
 function participants(){
- return header('Participants','Loaded directly from Google Apps Script.')+
- `<div class="bg-white border rounded-2xl overflow-hidden"><div class="p-4 border-b flex justify-between"><b>Participant List</b><button onclick="loadData()" class="text-indigo-600 font-semibold">Refresh</button></div>
- <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50"><tr><th class="p-4">BIB</th><th class="p-4">Participant</th><th class="p-4">Category</th><th class="p-4">Status</th><th class="p-4"></th></tr></thead><tbody class="divide-y">
- ${state.participants.map(p=>`<tr><td class="p-4 font-bold">${p.bib}</td><td class="p-4 font-semibold">${p.name}</td><td class="p-4">${p.category}</td><td class="p-4">${p.status}</td><td class="p-4"><button onclick="judge('${p.id}')" class="text-indigo-600 font-semibold">Judge</button></td></tr>`).join('')}
- </tbody></table></div></div>`;
+ return header('Participants',state.user.role==='ADMIN'?'Manage competition participants.':'Select a participant to judge.')+`<div class="bg-white border rounded-2xl overflow-hidden"><div class="p-4 border-b"><b>Participant List</b></div><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50"><tr><th class="p-4">BIB</th><th class="p-4">Participant</th><th class="p-4">Category</th><th class="p-4">Status</th><th class="p-4"></th></tr></thead><tbody class="divide-y">${state.participants.map(p=>{const x=state.scores.find(s=>String(s.participantId)===p.id);return `<tr><td class="p-4 font-bold">${p.bib}</td><td class="p-4 font-semibold">${p.name}</td><td class="p-4">${p.category}</td><td class="p-4">${x?.locked?'✓':x?'Saved':'—'}</td><td class="p-4">${state.user.role==='JUDGE'?`<button onclick="openJudge('${p.id}')" class="text-indigo-600 font-semibold">${x?.locked?'View':'Judge'}</button>`:''}</td></tr>`}).join('')}</tbody></table></div></div>`;
 }
-const criteria=[['pitch','Pitch',20],['vocalQuality','Vocal Quality',25],['rhythm','Rhythm',20],['expression','Expression',20],['stagePresence','Stage Presence',15]];
+const criteriaList=[['pitch','Pitch',20],['vocalQuality','Vocal Quality',25],['rhythm','Rhythm',20],['expression','Expression',20],['stagePresence','Stage Presence',15]];
 function judging(){
- return header('Judging','Enter scores and save them to Google Sheets.')+
- `<div class="bg-white border rounded-2xl p-6 max-w-4xl">
- <label class="text-sm font-medium">Participant</label>
- <select id="participant" onchange="loadScore()" class="mt-2 w-full border rounded-xl px-4 py-3"><option value="">-- Select Participant --</option>${state.participants.map(p=>`<option value="${p.id}">${p.bib} — ${p.name}</option>`).join('')}</select>
- <div id="scoreForm"></div></div>`;
+ return header('Judging','Scores are locked after confirmation.')+`<div class="bg-white border rounded-2xl p-6 max-w-4xl"><label class="text-sm font-medium">Participant</label><select id="participant" onchange="loadScore()" class="mt-2 w-full border rounded-xl px-4 py-3"><option value="">-- Select Participant --</option>${state.participants.map(p=>`<option value="${p.id}">${p.bib} — ${p.name}</option>`).join('')}</select><div id="scoreForm"></div></div>`;
 }
-function judge(id){state.page='judging';nav();render();setTimeout(()=>{document.getElementById('participant').value=id;loadScore()},50)}
+function openJudge(id){state.page='judging';nav();render();setTimeout(()=>{document.getElementById('participant').value=id;loadScore()},50)}
 function loadScore(){
  const id=document.getElementById('participant').value;if(!id){document.getElementById('scoreForm').innerHTML='';return}
- const old=state.scores.find(x=>String(x.participantId)===id);
- document.getElementById('scoreForm').innerHTML=`<div class="grid sm:grid-cols-2 gap-4 mt-6">${criteria.map(c=>`<label class="text-sm font-medium">${c[1]} (max ${c[2]})<input id="s_${c[0]}" type="number" min="0" max="${c[2]}" value="${old?old[c[0]]:''}" oninput="total()" class="mt-2 w-full border rounded-xl px-4 py-3"></label>`).join('')}</div>
- <label class="block mt-5 text-sm font-medium">Comments<textarea id="comments" rows="4" class="mt-2 w-full border rounded-xl px-4 py-3">${old?old.comments||'':''}</textarea></label>
- <div class="mt-5 flex items-center justify-between"><b>Total: <span id="total">0</span> / 100</b><button onclick="saveScore()" class="rounded-xl bg-indigo-600 text-white px-6 py-3 font-semibold">Save Score</button></div>`;
+ const old=state.scores.find(x=>String(x.participantId)===id),locked=!!old?.locked;
+ document.getElementById('scoreForm').innerHTML=`<div class="grid sm:grid-cols-2 gap-4 mt-6">${criteriaList.map(c=>`<label class="text-sm font-medium">${c[1]} <span class="text-slate-400">(max ${c[2]})</span><input id="s_${c[0]}" type="number" min="0" max="${c[2]}" value="${old?old[c[0]]:''}" ${locked?'disabled':''} oninput="total()" class="mt-2 w-full border rounded-xl px-4 py-3"></label>`).join('')}</div><label class="block mt-5 text-sm font-medium">Comments<textarea id="comments" rows="4" ${locked?'disabled':''} class="mt-2 w-full border rounded-xl px-4 py-3">${old?old.comments||'':''}</textarea></label><div class="mt-5 flex items-center justify-between"><b>Total: <span id="total">0</span> / 100</b>${locked?'<span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 text-emerald-700 px-3 py-2 font-semibold"><span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white"><i data-lucide="check" class="h-4 w-4"></i></span> Locked</span>':`<button onclick="confirmLock()" class="rounded-xl bg-indigo-600 text-white px-6 py-3 font-semibold flex items-center gap-2"><i data-lucide="lock" class="h-4 w-4"></i> Lock & Submit</button>`}</div>${locked?'<p class="mt-4 text-sm text-emerald-700 bg-emerald-50 rounded-xl p-3">Score locked. This score can no longer be edited.</p>':''}`;
  total();
 }
-function total(){let n=0;criteria.forEach(c=>n+=Number(document.getElementById('s_'+c[0])?.value)||0);const e=document.getElementById('total');if(e)e.textContent=n}
-function saveScore(){
- const participantId=document.getElementById('participant').value;
- if(!participantId){toast('Please select a participant.','error');return}
- const v={};for(const c of criteria){const n=Number(document.getElementById('s_'+c[0]).value);if(!Number.isFinite(n)||n<0||n>c[2]){toast(c[1]+' must be between 0 and '+c[2]+'.','error');return}v[c[0]]=n}
- const btn=document.querySelector('#scoreForm button');btn.disabled=true;btn.textContent='Saving...';
- gas('saveScore',{judgeId:state.judgeId,participantId,pitch:v.pitch,vocalQuality:v.vocalQuality,rhythm:v.rhythm,expression:v.expression,stagePresence:v.stagePresence,comments:document.getElementById('comments').value},r=>{
-   if(!r.success){toast(r.message||'Unable to save score.','error');btn.disabled=false;btn.textContent='Save Score';return}
-   toast('Score saved successfully.','success');loadData();
+function total(){let n=0;criteriaList.forEach(c=>n+=Number(document.getElementById('s_'+c[0])?.value)||0);const e=document.getElementById('total');if(e)e.textContent=n}
+function confirmLock(){
+ const id=document.getElementById('participant').value;
+ if(!id){toast('Please select a participant.','error');return}
+ let valid=true;criteriaList.forEach(c=>{const n=Number(document.getElementById('s_'+c[0]).value);if(!Number.isFinite(n)||n<0||n>c[2])valid=false});
+ if(!valid){toast('Please enter valid scores.','error');return}
+ const p=state.participants.find(x=>x.id===id),t=document.getElementById('total').textContent;
+ showModal('Confirm Submission',`<p>Are you sure you want to lock the score for <b>${p?.name||id}</b>?</p><p class="mt-3 text-lg">Total Score: <b>${t} / 100</b></p><p class="mt-3 text-sm text-amber-700 bg-amber-50 rounded-xl p-3">Once submitted, this score cannot be edited.</p><div class="mt-6 flex gap-3 justify-end"><button onclick="closeModal()" class="px-5 py-3 rounded-xl border">Cancel</button><button onclick="lockScore()" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold">Confirm & Lock</button></div>`);
+}
+function lockScore(){
+ closeModal();
+ const pid=document.getElementById('participant').value,v={};
+ criteriaList.forEach(c=>v[c[0]]=Number(document.getElementById('s_'+c[0]).value));
+ gas('saveScore',{userId:state.user.id,participantId:pid,pitch:v.pitch,vocalQuality:v.vocalQuality,rhythm:v.rhythm,expression:v.expression,stagePresence:v.stagePresence,comments:document.getElementById('comments').value,lock:'true'},d=>{
+   if(!d.success){toast(d.message,'error');return}
+   toast('Score locked successfully.','success');loadData();
  });
 }
-function scores(){return header('Score Records','Saved scores from Google Sheets.')+`<div class="bg-white border rounded-2xl overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50"><tr><th class="p-4">Participant</th><th class="p-4">Judge</th><th class="p-4">Total</th></tr></thead><tbody class="divide-y">${state.scores.map(s=>`<tr><td class="p-4">${state.participants.find(p=>p.id===String(s.participantId))?.name||s.participantId}</td><td class="p-4">${s.judgeId}</td><td class="p-4 font-bold">${s.total}</td></tr>`).join('')}</tbody></table></div>`}
-function events(){return header('Events','Competition events.')+'<div class="bg-white border rounded-2xl p-6">Vocal Competition 2026 · Solo Open</div>'}
-function judges(){return header('Judges','Judging panel.')+'<div class="bg-white border rounded-2xl p-6">Judge 01 · Active</div>'}
-function results(){return scores()}function ranking(){return scores()}function analytics(){return scores()}
+function scores(){return header('My Scores','Only your own scores are shown.')+scoreTable(state.scores)}
+function scoreTable(arr){return `<div class="bg-white border rounded-2xl overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50"><tr><th class="p-4">Participant</th><th class="p-4">Total</th><th class="p-4">Status</th></tr></thead><tbody class="divide-y">${arr.map(s=>`<tr><td class="p-4">${state.participants.find(p=>p.id===String(s.participantId))?.name||s.participantId}</td><td class="p-4 font-bold">${s.total}</td><td class="p-4 font-bold ${s.locked?'text-emerald-600':'text-amber-600'}">${s.locked?'<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-1 font-semibold"><span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white"><i data-lucide="check" class="h-3 w-3"></i></span>Locked</span>':'<span class="text-amber-600 font-semibold">Saved</span>'}</td></tr>`).join('')}</tbody></table></div>`}
+function live(){return header('Live Scores','Admin view — all judges, updated from the server.')+`<div class="bg-white border rounded-2xl overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50"><tr><th class="p-4">Participant</th>${state.judges.map(j=>`<th class="p-4">${j.id}</th>`).join('')}<th class="p-4">Average</th></tr></thead><tbody class="divide-y">${state.participants.map(p=>{const ss=state.scores.filter(s=>String(s.participantId)===p.id),avg=ss.length?(ss.reduce((a,s)=>a+Number(s.total||0),0)/ss.length).toFixed(2):'—';return `<tr><td class="p-4 font-semibold">${p.name}</td>${state.judges.map(j=>{const s=ss.find(x=>x.judgeId===j.id);return `<td class="p-4">${s?s.total:'—'}</td>`}).join('')}<td class="p-4 font-bold">${avg}</td></tr>`}).join('')}</tbody></table></div>`}
+function results(){return live()}
+function judges(){
+ return header('Judges','Add, edit, deactivate or delete judges.')+
+ `<div class="bg-white border rounded-2xl overflow-hidden"><div class="p-4 border-b flex justify-between items-center"><b>Judge Management</b><button onclick="showJudgeForm()" class="rounded-xl bg-indigo-600 text-white px-4 py-2 font-semibold">+ Add Judge</button></div><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50"><tr><th class="p-4">ID</th><th class="p-4">Name</th><th class="p-4">Role</th><th class="p-4">Status</th><th class="p-4">Action</th></tr></thead><tbody class="divide-y">${state.judges.map(j=>`<tr><td class="p-4 font-bold">${j.id}</td><td class="p-4">${j.name}</td><td class="p-4">${j.role}</td><td class="p-4">${j.status}</td><td class="p-4 flex gap-3"><button onclick="showJudgeForm('${j.id}')" class="text-indigo-600 font-semibold">Edit</button>${j.status==='ACTIVE'?`<button onclick="deleteJudge('${j.id}')" class="text-red-600 font-semibold">Delete</button>`:`<button onclick="deleteJudge('${j.id}')" class="text-red-600 font-semibold">Delete</button>`}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+function showJudgeForm(id=''){
+ const j=state.judges.find(x=>x.id===id)||{id:'',name:'',pin:'',status:'ACTIVE'};
+ showModal(id?'Edit Judge':'Add Judge',`<label class="text-sm font-medium">Judge ID<input id="jf_id" value="${j.id}" ${id?'disabled':''} class="mt-2 w-full border rounded-xl px-4 py-3"></label><label class="block mt-4 text-sm font-medium">Name<input id="jf_name" value="${j.name}" class="mt-2 w-full border rounded-xl px-4 py-3"></label><label class="block mt-4 text-sm font-medium">PIN<input id="jf_pin" value="${j.pin||''}" class="mt-2 w-full border rounded-xl px-4 py-3"></label><div class="mt-6 flex justify-end gap-3"><button onclick="closeModal()" class="px-5 py-3 rounded-xl border">Cancel</button><button onclick="saveJudge('${id}')" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold">Save</button></div>`);
+}
+function saveJudge(oldId){
+ const id=document.getElementById('jf_id').value.trim(),name=document.getElementById('jf_name').value.trim(),pin=document.getElementById('jf_pin').value.trim();
+ if(!id||!name||!pin){toast('ID, name and PIN are required.','error');return}
+ gas(oldId?'updateJudge':'addJudge',{userId:state.user.id,judgeId:id,name,pin,status:'ACTIVE'},d=>{if(!d.success){toast(d.message,'error');return}closeModal();toast('Judge saved.','success');loadData()});
+}
+function deleteJudge(id){
+ const j=state.judges.find(x=>x.id===id);
+ showModal('Delete Judge?',`<p>Are you sure you want to delete <b>${j?.id||id} — ${j?.name||''}</b>?</p><p class="mt-3 text-sm text-amber-700 bg-amber-50 rounded-xl p-3">If this judge already has scores, the judge will be deactivated and historical scores will remain.</p><div class="mt-6 flex justify-end gap-3"><button onclick="closeModal()" class="px-5 py-3 rounded-xl border">Cancel</button><button onclick="confirmDeleteJudge('${id}')" class="px-5 py-3 rounded-xl bg-red-600 text-white font-semibold">Delete Judge</button></div>`);
+}
+function confirmDeleteJudge(id){closeModal();gas('deleteJudge',{userId:state.user.id,judgeId:id},d=>{if(!d.success){toast(d.message,'error');return}toast(d.mode==='DEACTIVATED'?'Judge deactivated; historical scores kept.':'Judge deleted.','success');loadData()})}
+function criteria(){return header('Criteria','Current scoring criteria.')+'<div class="bg-white border rounded-2xl p-6">'+criteriaList.map(c=>`<div class="flex justify-between border-b py-3"><span>${c[1]}</span><b>${c[2]}</b></div>`).join('')+'</div>'}
+function settings(){return header('Settings','Competition settings.')+'<div class="bg-white border rounded-2xl p-6">Vocal Competition 2026 · Solo Open</div>'}
+function showModal(title,body){document.getElementById('modalBox').innerHTML=`<h3 class="text-xl font-bold">${title}</h3><div class="mt-4">${body}</div>`;const m=document.getElementById('modal');m.classList.remove('hidden');m.classList.add('flex')}
+function closeModal(){const m=document.getElementById('modal');m.classList.add('hidden');m.classList.remove('flex')}
 function toggleSide(){document.getElementById('side').classList.toggle('-translate-x-full')}
 function toast(m,t='success'){const e=document.createElement('div');e.className='rounded-xl px-4 py-3 text-white shadow-xl '+(t==='error'?'bg-red-600':'bg-emerald-600');e.textContent=m;document.getElementById('toast').appendChild(e);setTimeout(()=>e.remove(),3500)}
 lucide.createIcons();
