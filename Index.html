@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VocalScore 2.0</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .sidebar-transition { transition: transform .25s ease; }
+    .page-transition { animation: fadeIn .18s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .score-input::-webkit-inner-spin-button,
+    .score-input::-webkit-outer-spin-button { opacity: 1; }
+  
+    @media print {
+      #sidebar, header, #overlay, #toast-container { display:none !important; }
+      .lg\\:pl-72 { padding-left:0 !important; }
+      main { padding:0 !important; }
+      body { background:white !important; }
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900">
+<div id="toast-container" class="fixed right-4 top-4 z-[100] space-y-2"></div>
+
+<!-- LOGIN -->
+<div id="login-view" class="min-h-screen flex items-center justify-center bg-slate-950 p-6">
+  <div class="w-full max-w-md">
+    <div class="text-center text-white mb-8">
+      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 shadow-xl">
+        <i data-lucide="mic-2" class="h-8 w-8"></i>
+      </div>
+      <h1 class="text-3xl font-bold tracking-tight">VocalScore</h1>
+      <p class="mt-2 text-slate-400">Digital Vocal Competition Judging System</p>
+    </div>
+
+    <div class="rounded-2xl bg-white p-7 shadow-2xl">
+      <h2 class="text-xl font-semibold">Judge Login</h2>
+      <p class="mt-1 text-sm text-slate-500">Sign in to access the judging panel.</p>
+
+      <label class="mt-6 block text-sm font-medium">Judge ID</label>
+      <input id="login-judge" value="J01"
+        class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+
+      <label class="mt-4 block text-sm font-medium">PIN</label>
+      <input id="login-pin" type="password" value="1234"
+        class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+
+      <button onclick="login()"
+        class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700">
+        <i data-lucide="log-in" class="h-5 w-5"></i>
+        Login
+      </button>
+
+      <p class="mt-4 text-center text-xs text-slate-400">Demo PIN: 1234</p>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-view" class="hidden min-h-screen">
+  <!-- Mobile overlay -->
+  <div id="overlay" onclick="toggleSidebar(false)" class="fixed inset-0 z-30 hidden bg-slate-950/50 lg:hidden"></div>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="sidebar-transition fixed inset-y-0 left-0 z-40 w-72 -translate-x-full bg-[#111827] text-white lg:translate-x-0">
+    <div class="flex h-full flex-col">
+      <div class="flex items-center gap-3 border-b border-white/10 px-5 py-5">
+
+        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600">
+          <i data-lucide="mic-2" class="h-6 w-6"></i>
+        </div>
+        <div>
+          <div class="font-bold">VocalScore</div>
+          <div class="text-xs text-slate-400">Digital Judging System</div>
+        </div>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto px-3 py-5">
+        <div class="mb-3 px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Main</div>
+        <div id="nav-dashboard"></div>
+
+        <div class="mb-3 mt-6 px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Competition</div>
+        <div id="nav-competition"></div>
+
+        <div class="mb-3 mt-6 px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Judging</div>
+        <div id="nav-judging"></div>
+
+        <div class="mb-3 mt-6 px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Results</div>
+        <div id="nav-results"></div>
+
+        <div class="mb-3 mt-6 px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Reports</div>
+        <div id="nav-reports"></div>
+
+        <div class="mb-3 mt-6 px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">System</div>
+        <div id="nav-system"></div>
+      </nav>
+
+      <div class="border-t border-white/10 p-4">
+        <div class="flex items-center gap-3 rounded-xl bg-white/5 p-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 font-bold">J1</div>
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-sm font-semibold">Judge 01</div>
+            <div class="flex items-center gap-1 text-xs text-emerald-400">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Online
+            </div>
+          </div>
+          <button onclick="logout()" title="Logout" class="text-slate-400 hover:text-white">
+            <i data-lucide="log-out" class="h-5 w-5"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="lg:pl-72">
+    <header class="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+      <div class="flex items-center gap-3">
+        <button onclick="toggleSidebar(true)" class="rounded-lg p-2 hover:bg-slate-100 lg:hidden">
+          <i data-lucide="menu" class="h-6 w-6"></i>
+        </button>
+        <div>
+          <div class="font-bold">VocalScore</div>
+          <div class="hidden text-xs text-slate-500 sm:block">Vocal Competition 2026</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 md:block">
+          Vocal Competition 2026
+        </div>
+        <div class="hidden items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 sm:flex">
+          <span class="h-2 w-2 rounded-full bg-emerald-500"></span> Online
+        </div>
+        <div class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">J1</div>
+      </div>
+    </header>
+
+    <main id="app" class="p-4 sm:p-6 lg:p-8"></main>
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://script.googleusercontent.com/a/macros/moe-dl.edu.my/echo?user_content_key=AUkAhnT8vZf7UR3gJZD6CztHpYC_Git5OSPWS8DpZuVYO8JPKdGz2veauPHfBIIVF_El4v36WrZeWViWQ8YezdeUHKDuSGEDHMgEOhhqU_30HDveuCmusLG5GKdAs5fSZ8q8qubi5XHEHlxQN96ljJ0Os0Isyiss6AwVChjORw3rTFn8ttnIhlvReOIRHHzynZeNfpNUW9UF50IrFGqmJd7Lb8XXpC-D5PmW-iWCLP0WW9vlbt167cBpTIsXzmeXVyhXQq0bQ2E_KDGJuQ3Q0uOwIvdfPe9EuoYuFeIJ10j3Szp7TrGTC-ZgF3G9wByqzcSS1lxtuBCQ&lib=MDfLeraXOtY7tRs1IQzwEPjimZkoIcWwo';
+
+
+function gasRequest(params) {
+  return new Promise((resolve, reject) => {
+    const callbackName = 'gasCallback_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const query = new URLSearchParams({...params, callback: callbackName});
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('GAS server timeout. Please check the deployment.'));
+    }, 15000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[callbackName];
+      script.remove();
+    }
+
+    window[callbackName] = (data) => {
+      cleanup();
+      if (data && data.success === false) {
+        reject(new Error(data.message || 'GAS request failed.'));
+      } else {
+        resolve(data);
+      }
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Unable to connect to GAS server.'));
+    };
+
+    script.src = API_URL + (API_URL.includes('?') ? '&' : '?') + query.toString();
+    document.head.appendChild(script);
+  });
+}
+
+
+async function fetchParticipantsFromServer() {
+  try {
+    const data = await gasRequest({ action: 'participants' });
+
+    state.participants = (data.participants || []).map(p => ({
+      id: String(p.ParticipantID || p.participantId || ''),
+      bib: String(p.BIB ?? p.Bib ?? p.bib ?? ''),
+      name: String(p.Name || p.name || ''),
+      category: String(p.Category || p.category || ''),
+      status: 'pending'
+    })).filter(p => p.id);
+
+    state.serverOnline = true;
+    state.lastSync = new Date();
+    renderPage();
+    showToast(`Loaded ${state.participants.length} participants from server.`, 'success');
+  } catch (error) {
+    state.serverOnline = false;
+    showToast('Could not load participants from server: ' + error.message, 'error');
+  }
+}
+async function fetchScoresFromServer() {
+  try {
+    const data = await gasRequest({
+      action: 'scores',
+      judgeId: state.currentJudge.id
+    });
+
+    state.scores = data.scores || [];
+
+    state.participants.forEach(p => {
+      const hasScore = state.scores.some(
+        s => String(s.participantId) === String(p.id) &&
+             String(s.judgeId) === String(state.currentJudge.id)
+      );
+      p.status = hasScore ? 'completed' : 'pending';
+    });
+
+    state.serverOnline = true;
+    state.lastSync = new Date();
+    renderPage();
+  } catch (error) {
+    state.serverOnline = false;
+    showToast('Could not load scores from server: ' + error.message, 'error');
+  }
+}
+
+
+const state = {
+  currentPage: "dashboard",
+  currentJudge: { id: "J01", name: "Judge 01" },
+  participants: [
+    {id:"V001", bib:"001", name:"Aisyah", category:"Solo", status:"pending"},
+    {id:"V002", bib:"002", name:"Daniel", category:"Solo", status:"completed"},
+    {id:"V003", bib:"003", name:"Maria", category:"Solo", status:"completed"},
+    {id:"V004", bib:"004", name:"Jonathan", category:"Solo", status:"pending"},
+    {id:"V005", bib:"005", name:"Sarah", category:"Solo", status:"pending"},
+    {id:"V006", bib:"006", name:"Michael", category:"Solo", status:"pending"}
+  ],
+  serverOnline: false,
+  lastSync: null,
+  scores: []
+};
+
+const criteria = [
+  {key:"pitch", label:"Pitch", max:20},
+  {key:"vocalQuality", label:"Vocal Quality", max:25},
+  {key:"rhythm", label:"Rhythm", max:20},
+  {key:"expression", label:"Expression", max:20},
+  {key:"stagePresence", label:"Stage Presence", max:15}
+];
+
+const navItems = {
+  dashboard: [{id:"dashboard",label:"Dashboard",icon:"layout-dashboard"}],
+  competition: [
+    {id:"events",label:"Events",icon:"calendar-days"},
+    {id:"participants",label:"Participants",icon:"users"},
+    {id:"judges",label:"Judges",icon:"gavel"}
+  ],
+  judging: [
+    {id:"judging",label:"Judging",icon:"clipboard-pen-line"},
+    {id:"scores",label:"Score Records",icon:"file-check-2"}
+  ],
+  results: [
+    {id:"results",label:"Results",icon:"trophy"},
+    {id:"ranking",label:"Ranking",icon:"medal"},
+    {id:"analytics",label:"Analytics",icon:"chart-column"}
+  ],
+  reports: [
+    {id:"reports",label:"Reports",icon:"file-text"},
+    {id:"certificates",label:"Certificates",icon:"award"}
+  ],
+  system: [{id:"settings",label:"Settings",icon:"settings"}]
+};
+
+function icon(name, cls="h-5 w-5") {
+  return `<i data-lucide="${name}" class="${cls}"></i>`;
+}
+
+function renderNav() {
+  Object.entries(navItems).forEach(([section,items]) => {
+    const el = document.getElementById("nav-"+section);
+    if (!el) return;
+    el.innerHTML = items.map(item => `
+      <button onclick="navigate('${item.id}')"
+        class="nav-item flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition
+        ${state.currentPage===item.id ? "bg-indigo-600 text-white" : "text-slate-300 hover:bg-white/5 hover:text-white"}">
+        ${icon(item.icon,"h-5 w-5")}
+        <span>${item.label}</span>
+      </button>
+    `).join("");
+  });
+  lucide.createIcons();
+}
+
+function navigate(page) {
+  state.currentPage = page;
+  renderNav();
+  renderPage();
+  toggleSidebar(false);
+}
+
+function renderPage() {
+  const app = document.getElementById("app");
+  const pages = {
+    dashboard: pageDashboard,
+    participants: pageParticipants,
+    events: pageEvents,
+    judges: pageJudges,
+    judging: pageJudging,
+    scores: pageScores,
+    results: pageResults,
+    ranking: pageRanking,
+    analytics: pageAnalytics,
+    reports: pageReports,
+    certificates: pageCertificates,
+    settings: pageSettings
+  };
+  app.innerHTML = `<div class="page-transition">${(pages[state.currentPage] || pageDashboard)()}</div>`;
+  lucide.createIcons();
+}
+
+function pageHeader(title, subtitle, action="") {
+  return `
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">${title}</h1>
+        <p class="mt-1 text-sm text-slate-500">${subtitle}</p>
+      </div>
+      ${action}
+    </div>`;
+}
+
+function statCard(label,value,iconName,description) {
+  return `
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-sm font-medium text-slate-500">${label}</p>
+          <p class="mt-2 text-3xl font-bold">${value}</p>
+          <p class="mt-2 text-xs text-slate-400">${description}</p>
+        </div>
+        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+          ${icon(iconName)}
+        </div>
+      </div>
+    </div>`;
+}
+
+function pageDashboard() {
+  const completed = state.participants.filter(p=>p.status==="completed").length;
+  const pending = state.participants.length-completed;
+  const totals = state.scores.map(scoreTotal);
+  const avg = totals.length ? (totals.reduce((a,b)=>a+b,0)/totals.length).toFixed(1) : "0.0";
+
+  return `
+    ${pageHeader("Dashboard","Welcome back, Judge 01.",
+      `<button onclick="navigate('judging')" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">${icon("play","h-4 w-4")} Start Judging</button>`)}
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      ${statCard("Total Participants",state.participants.length,"users","Registered for current event")}
+      ${statCard("Completed Judging",completed,"circle-check","Scores submitted")}
+      ${statCard("Pending Judging",pending,"clock-3","Participants remaining")}
+      ${statCard("Average Score",avg,"chart-no-axes-column","Based on submitted scores")}
+    </div>
+
+    <div class="mt-6 grid gap-6 xl:grid-cols-3">
+      <div class="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="font-semibold">Current Event</h2>
+            <p class="mt-1 text-sm text-slate-500">Competition currently assigned to you</p>
+          </div>
+          <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">LIVE</span>
+        </div>
+        <div class="mt-5 rounded-xl bg-slate-50 p-5">
+          <div class="text-lg font-bold">Vocal Competition 2026</div>
+          <div class="mt-2 grid gap-3 text-sm text-slate-500 sm:grid-cols-3">
+            <div><span class="block text-xs text-slate-400">Category</span><span class="font-medium text-slate-700">Solo Open</span></div>
+            <div><span class="block text-xs text-slate-400">Date</span><span class="font-medium text-slate-700">25 August 2026</span></div>
+            <div><span class="block text-xs text-slate-400">Venue</span><span class="font-medium text-slate-700">Main Hall</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="font-semibold">Quick Actions</h2>
+        <div class="mt-4 space-y-2">
+          <button onclick="navigate('judging')" class="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left text-sm hover:bg-slate-50">${icon("clipboard-pen-line","h-5 w-5 text-indigo-600")} Start Judging</button>
+          <button onclick="navigate('participants')" class="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left text-sm hover:bg-slate-50">${icon("users","h-5 w-5 text-indigo-600")} View Participants</button>
+          <button onclick="navigate('results')" class="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left text-sm hover:bg-slate-50">${icon("trophy","h-5 w-5 text-indigo-600")} View Results</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-6 grid gap-4 md:grid-cols-3">
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">${icon("wifi","h-5 w-5")}</div>
+          <div><div class="text-sm font-semibold">System Status</div><div class="text-xs ${state.serverOnline ? "text-emerald-600" : "text-amber-600"}">${state.serverOnline ? "Server connected" : "Waiting for server"}</div></div>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">${icon("database","h-5 w-5")}</div>
+          <div><div class="text-sm font-semibold">Score Records</div><div class="text-xs text-slate-500">${state.scores.length} submitted records</div></div>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">${icon("clock-3","h-5 w-5")}</div>
+          <div><div class="text-sm font-semibold">Event Status</div><div class="text-xs text-amber-600">Live judging</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div class="flex items-center justify-between border-b border-slate-100 p-5">
+        <div><h2 class="font-semibold">Participants</h2><p class="text-sm text-slate-500">Current judging progress</p></div>
+        <button onclick="navigate('participants')" class="text-sm font-semibold text-indigo-600 hover:text-blue-700">View All</button>
+      </div>
+      ${participantTable(state.participants.slice(0,5))}
+    </div>`;
+}
+
+function participantTable(items) {
+  return `
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+        <tr><th class="px-5 py-3">BIB</th><th class="px-5 py-3">Participant</th><th class="px-5 py-3">Category</th><th class="px-5 py-3">Status</th><th class="px-5 py-3">Action</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        ${items.map(p=>`
+        <tr class="hover:bg-slate-50/70">
+          <td class="px-5 py-4 font-semibold">${p.bib}</td>
+          <td class="px-5 py-4"><div class="font-medium">${p.name}</div><div class="text-xs text-slate-400">${p.id}</div></td>
+          <td class="px-5 py-4 text-slate-500">${p.category}</td>
+          <td class="px-5 py-4">${statusBadge(p.status)}</td>
+          <td class="px-5 py-4"><button onclick="startJudging('${p.id}')" class="font-semibold text-indigo-600 hover:text-blue-700">Judge</button></td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function statusBadge(status) {
+  const map = {
+    pending:["Pending","bg-amber-50 text-amber-700"],
+    completed:["Completed","bg-emerald-50 text-emerald-700"],
+    submitted:["Submitted","bg-indigo-50 text-blue-700"],
+    draft:["Draft","bg-slate-100 text-slate-600"]
+  };
+  const [label,cls]=map[status]||[status,"bg-slate-100 text-slate-600"];
+  return `<span class="rounded-full px-2.5 py-1 text-xs font-semibold ${cls}">${label}</span>`;
+}
+
+function pageParticipants() {
+  return `
+    ${pageHeader("Participants","Manage registered participants.",
+      `<div class="flex gap-2">
+        <button onclick="fetchParticipantsFromServer()" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-50">${icon("refresh-cw","h-4 w-4")} Refresh</button>
+        <button onclick="showToast('Participant creation will be connected to the server in the next phase.','info')" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">${icon("plus","h-4 w-4")} Add Participant</button>
+      </div>`)}
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row">
+      <div class="relative flex-1">${icon("search","absolute left-3 top-3 h-5 w-5 text-slate-400")}<input id="participant-search" oninput="filterParticipants()" placeholder="Search participant..." class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 outline-none focus:border-indigo-500"></div>
+      <select id="participant-status" onchange="filterParticipants()" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 outline-none"><option value="">All Status</option><option value="pending">Pending</option><option value="completed">Completed</option></select>
+    </div>
+    <div class="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+      <span class="flex items-center gap-2">${icon(state.serverOnline ? "cloud-check" : "cloud-off","h-4 w-4")} ${state.serverOnline ? "Connected to VocalScore Server" : "Server not connected"}</span>
+      <span>${state.lastSync ? "Last sync: " + state.lastSync.toLocaleTimeString() : ""}</span>
+    </div>
+    <div id="participants-table" class="rounded-2xl border border-slate-200 bg-white shadow-sm">${participantTable(state.participants)}</div>`;
+}
+
+function filterParticipants() {
+  const q=(document.getElementById("participant-search")?.value||"").toLowerCase();
+  const status=document.getElementById("participant-status")?.value||"";
+  const filtered=state.participants.filter(p=>(!q || p.name.toLowerCase().includes(q)||p.bib.includes(q)||p.id.toLowerCase().includes(q))&&(!status||p.status===status));
+  document.getElementById("participants-table").innerHTML=participantTable(filtered);
+  lucide.createIcons();
+}
+
+function pageEvents() {
+  return `
+    ${pageHeader("Events","Manage competition events.",
+      `<button onclick="showToast('Event creation will be connected to the server in Phase 2.','info')" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white">${icon("plus","h-4 w-4")} Create Event</button>`)}
+    <div class="grid gap-5 md:grid-cols-2">
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex items-center justify-between"><span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">LIVE</span>${icon("calendar-days","h-6 w-6 text-indigo-600")}</div>
+        <h2 class="mt-5 text-xl font-bold">Vocal Competition 2026</h2>
+        <p class="mt-1 text-sm text-slate-500">Solo Open</p>
+        <div class="mt-5 grid grid-cols-2 gap-4 text-sm"><div><span class="block text-xs text-slate-400">Date</span>25 August 2026</div><div><span class="block text-xs text-slate-400">Venue</span>Main Hall</div></div>
+      </div>
+    </div>`;
+}
+
+function pageJudges() {
+  return `
+    ${pageHeader("Judges","Manage judging panel.",
+      `<button onclick="showToast('Judge management will be connected to the server in Phase 2.','info')" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white">${icon("plus","h-4 w-4")} Add Judge</button>`)}
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      ${["Judge 01","Judge 02","Judge 03"].map((n,i)=>`
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div class="flex items-center gap-4"><div class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 font-bold text-white">J${i+1}</div><div><h3 class="font-semibold">${n}</h3><p class="text-xs text-emerald-600">Active</p></div></div>
+          <div class="mt-5 text-sm text-slate-500">Assigned Panel <span class="float-right font-medium text-slate-800">Vocal</span></div>
+        </div>`).join("")}
+    </div>`;
+}
+
+function pageJudging() {
+  return `
+    ${pageHeader("Judging","Enter and submit your score for each participant.")}
+    <div class="grid gap-6 xl:grid-cols-3">
+      <div class="xl:col-span-2">
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div class="mb-5"><h2 class="font-semibold">Judge Form</h2><p class="text-sm text-slate-500">Select a participant and enter the performance score.</p></div>
+          <label class="text-sm font-medium">Participant</label>
+          <select id="judge-participant" onchange="loadParticipant()" class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-indigo-500">
+            <option value="">-- Select Participant --</option>
+            ${state.participants.map(p=>`<option value="${p.id}">${p.bib} — ${p.name}</option>`).join("")}
+          </select>
+          <div id="participant-info" class="mt-5 hidden rounded-xl bg-slate-50 p-4"></div>
+          <div id="score-form" class="mt-6"></div>
+        </div>
+      </div>
+      <div>
+        <div class="sticky top-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p class="text-sm font-medium text-slate-500">Total Score</p>
+          <div id="live-total" class="mt-2 text-5xl font-bold text-slate-900">0<span class="text-xl text-slate-400"> / 100</span></div>
+          <div class="mt-5 h-3 overflow-hidden rounded-full bg-slate-100"><div id="score-progress" class="h-full rounded-full bg-indigo-600 transition-all" style="width:0%"></div></div>
+          <div class="mt-6 rounded-xl bg-indigo-50 p-4 text-sm text-indigo-800"><div class="font-semibold">Judge</div><div class="mt-1">Judge 01 · Online</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function loadParticipant() {
+  const id=document.getElementById("judge-participant").value;
+  const info=document.getElementById("participant-info");
+  const form=document.getElementById("score-form");
+  if(!id){info.classList.add("hidden");form.innerHTML="";updateTotal();return;}
+  const p=state.participants.find(x=>x.id===id);
+  const existing=state.scores.find(x=>x.participantId===id&&x.judgeId===state.currentJudge.id);
+  info.classList.remove("hidden");
+  info.innerHTML=`<div class="grid gap-3 sm:grid-cols-3"><div><span class="text-xs text-slate-400">BIB Number</span><div class="font-semibold">${p.bib}</div></div><div><span class="text-xs text-slate-400">Name</span><div class="font-semibold">${p.name}</div></div><div><span class="text-xs text-slate-400">Category</span><div class="font-semibold">${p.category}</div></div></div>`;
+  form.innerHTML=`
+    <div class="grid gap-4 sm:grid-cols-2">
+      ${criteria.map(c=>`<div><label class="text-sm font-medium">${c.label} <span class="text-slate-400">(max ${c.max})</span></label><input id="score-${c.key}" class="score-input mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-lg font-semibold outline-none focus:border-indigo-500" type="number" min="0" max="${c.max}" value="${existing?existing[c.key]:""}" oninput="updateTotal()"></div>`).join("")}
+    </div>
+    <div class="mt-5"><label class="text-sm font-medium">Judge's Comments</label><textarea id="judge-comments" rows="4" placeholder="Enter your comments about the performance..." class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-indigo-500">${existing?.comments||""}</textarea></div>
+    <div class="mt-5 flex flex-col gap-3 sm:flex-row"><button onclick="saveScore()" class="flex-1 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-700">${icon("save","inline-block mr-2 h-5 w-5")}Save Score</button><button onclick="clearScoreForm()" class="rounded-xl border border-slate-200 px-5 py-3 font-semibold hover:bg-slate-50">Clear Form</button></div>`;
+  updateTotal();
+  lucide.createIcons();
+}
+
+function updateTotal() {
+  let total=0;
+  criteria.forEach(c=>{ total += Math.min(Number(document.getElementById("score-"+c.key)?.value)||0,c.max); });
+  const totalEl=document.getElementById("live-total");
+  if(totalEl) totalEl.innerHTML=`${total}<span class="text-xl text-slate-400"> / 100</span>`;
+  const bar=document.getElementById("score-progress");
+  if(bar) bar.style.width=total+"%";
+}
+
+function clearScoreForm() {
+  criteria.forEach(c=>{const el=document.getElementById("score-"+c.key);if(el)el.value="";});
+  const comments=document.getElementById("judge-comments");if(comments)comments.value="";
+  updateTotal();
+}
+
+async function saveScore() {
+  const participantId = document.getElementById("judge-participant")?.value;
+  if (!participantId) {
+    showToast("Please select a participant.", "error");
+    return;
+  }
+
+  const values = {};
+  let total = 0;
+
+  for (const c of criteria) {
+    const el = document.getElementById("score-" + c.key);
+    const value = Number(el?.value);
+    if (!Number.isFinite(value) || value < 0 || value > c.max) {
+      showToast(`Please enter a valid ${c.label} score. Maximum is ${c.max}.`, "error");
+      el?.focus();
+      return;
+    }
+    values[c.key] = value;
+    total += value;
+  }
+
+  const comments = document.getElementById("judge-comments")?.value || "";
+
+  const button = document.querySelector('button[onclick="saveScore()"]');
+  if (button) {
+    button.disabled = true;
+    button.classList.add("opacity-60", "cursor-not-allowed");
+  }
+
+  try {
+    const data = await gasRequest({
+      action: "saveScore",
+      judgeId: state.currentJudge.id,
+      participantId,
+      pitch: values.pitch,
+      vocalQuality: values.vocalQuality,
+      rhythm: values.rhythm,
+      expression: values.expression,
+      stagePresence: values.stagePresence,
+      comments
+    });
+
+    showToast("Score saved to server successfully.", "success");
+
+    await fetchScoresFromServer();
+
+    const select = document.getElementById("judge-participant");
+    if (select) {
+      select.value = participantId;
+      loadParticipant();
+    }
+  } catch (error) {
+    showToast("Score was not saved: " + error.message, "error");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.classList.remove("opacity-60", "cursor-not-allowed");
+    }
+  }
+}
+
+function scoreTotal(s){return criteria.reduce((sum,c)=>sum+(Number(s[c.key])||0),0);}
+
+function pageScores() {
+  return `
+    ${pageHeader("Score Records","Review submitted scores.", `<button onclick="fetchScoresFromServer()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-50">${icon("refresh-cw","h-4 w-4")} Refresh</button>`)}
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div class="overflow-x-auto"><table class="w-full text-left text-sm">
+      <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-5 py-3">BIB</th><th class="px-5 py-3">Participant</th><th class="px-5 py-3">Judge</th><th class="px-5 py-3">Score</th><th class="px-5 py-3">Status</th><th class="px-5 py-3">Action</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">
+      ${state.scores.map(s=>{const p=state.participants.find(x=>x.id===s.participantId);return `<tr><td class="px-5 py-4 font-semibold">${p?.bib||"-"}</td><td class="px-5 py-4 font-medium">${p?.name||"-"}</td><td class="px-5 py-4">${s.judgeId || "-"}</td><td class="px-5 py-4 font-bold">${scoreTotal(s)}</td><td class="px-5 py-4">${statusBadge("completed")}</td><td class="px-5 py-4"><button onclick="startJudging('${p?.id}')" class="font-semibold text-indigo-600">View</button></td></tr>`}).join("")}
+      </tbody></table></div></div>`;
+}
+
+function pageResults() {
+  const ranked=rankedParticipants();
+  return `
+    ${pageHeader("Results","Current competition results.")}
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div class="border-b border-slate-100 p-5"><h2 class="font-semibold">Competition Results</h2><p class="text-sm text-slate-500">Scores based on submitted judging records.</p></div>
+      ${resultsTable(ranked)}
+    </div>`;
+}
+
+function resultsTable(items) {
+  return `<div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-5 py-3">Rank</th><th class="px-5 py-3">BIB</th><th class="px-5 py-3">Participant</th><th class="px-5 py-3">Total Score</th><th class="px-5 py-3">Status</th></tr></thead><tbody class="divide-y divide-slate-100">${items.map((x,i)=>`<tr><td class="px-5 py-4 font-bold">${i+1}</td><td class="px-5 py-4">${x.bib}</td><td class="px-5 py-4 font-semibold">${x.name}</td><td class="px-5 py-4 text-lg font-bold">${x.score}</td><td class="px-5 py-4">${statusBadge(x.score>0?"completed":"pending")}</td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function rankedParticipants() {
+  return state.participants.map(p=>{
+    const ss=state.scores.filter(s=>s.participantId===p.id);
+    const score=ss.length?(ss.reduce((a,s)=>a+scoreTotal(s),0)/ss.length).toFixed(2):"0.00";
+    return {...p,score:Number(score)};
+  }).sort((a,b)=>b.score-a.score);
+}
+
+function pageRanking() {
+  const items=rankedParticipants();
+  return `${pageHeader("Ranking","Overall ranking for the current event.",`<button onclick="window.print()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-50">${icon("printer","h-4 w-4")} Print Ranking</button>`)}
+  <div class="grid gap-4 md:grid-cols-3 mb-6">
+    ${items.slice(0,3).map((x,i)=>`<div class="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm"><div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full ${i===0?"bg-amber-100 text-amber-700":i===1?"bg-slate-100 text-slate-700":"bg-orange-100 text-orange-700"} text-xl font-bold">${i+1}</div><div class="mt-4 font-bold">${x.name}</div><div class="mt-1 text-3xl font-bold">${x.score}</div><div class="text-xs text-slate-400">Total Score</div></div>`).join("")}
+  </div>
+  <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">${resultsTable(items)}</div>`;
+}
+
+function pageAnalytics() {
+  const avgs=criteria.map(c=>{
+    const vals=state.scores.map(s=>Number(s[c.key])||0);
+    return {...c,avg:vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1):"0.0"};
+  });
+  return `${pageHeader("Analytics","Performance analysis by scoring criterion.")}
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">${avgs.map(c=>`<div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">${c.label}</p><div class="mt-3 text-3xl font-bold">${c.avg}</div><div class="mt-3 h-2 rounded-full bg-slate-100"><div class="h-2 rounded-full bg-blue-600" style="width:${(Number(c.avg)/c.max)*100}%"></div></div><p class="mt-2 text-xs text-slate-400">Average / ${c.max}</p></div>`).join("")}</div>`;
+}
+
+function pageReports() {
+  return `${pageHeader("Reports","Generate competition reports.")}<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">${["Competition Report","Participant Report","Judge Report","Score Report","Ranking Report","Analytics Report"].map((x,i)=>`<button onclick="showToast('${x} will be connected to the reporting engine in Phase 2.','info')" class="rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm hover:border-indigo-200 hover:shadow"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">${icon(["file-text","users","gavel","clipboard-list","medal","chart-column"][i])}</div><h3 class="mt-4 font-semibold">${x}</h3><p class="mt-1 text-sm text-slate-500">Preview and export this report.</p></button>`).join("")}</div>`;
+}
+
+function pageCertificates() {
+  return `${pageHeader("Certificates","Preview and generate participant certificates.")}<div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><div class="mx-auto max-w-2xl rounded-xl border-8 border-slate-100 p-10 text-center"><div class="text-sm font-semibold uppercase tracking-widest text-slate-400">Certificate of Achievement</div><div class="mt-8 text-4xl font-bold">Vocal Competition 2026</div><div class="mt-8 text-slate-500">This certificate is proudly presented to</div><div class="mt-3 text-3xl font-bold">Participant Name</div><div class="mt-3 text-slate-500">for outstanding performance</div><div class="mt-8 text-lg font-semibold">Category: Solo Open</div></div><div class="mt-6 flex justify-center gap-3"><button onclick="showToast('Certificate generator will be connected in Phase 2.','info')" class="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white">Generate Certificate</button><button onclick="window.print()" class="rounded-xl border border-slate-200 px-5 py-3 font-semibold">Print Certificate</button></div></div>`;
+}
+
+function pageSettings() {
+  return `${pageHeader("Settings","Configure VocalScore system preferences.")}<div class="grid gap-6 lg:grid-cols-2"><div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><h2 class="font-semibold">Competition Settings</h2><div class="mt-5 space-y-4"><label class="block text-sm font-medium">Competition Name<input value="Vocal Competition 2026" class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"></label><label class="block text-sm font-medium">Category<input value="Solo Open" class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"></label><label class="block text-sm font-medium">Venue<input value="Main Hall" class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"></label></div></div><div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><h2 class="font-semibold">Scoring Criteria</h2><div class="mt-5 space-y-3">${criteria.map(c=>`<div class="flex items-center justify-between rounded-xl bg-slate-50 p-4"><span class="font-medium">${c.label}</span><span class="font-bold">${c.max}</span></div>`).join("")}</div></div></div>`;
+}
+
+function startJudging(id) {
+  navigate("judging");
+  setTimeout(()=>{const select=document.getElementById("judge-participant");if(select){select.value=id;loadParticipant();}},50);
+}
+
+function toggleSidebar(open) {
+  const sb=document.getElementById("sidebar"), ov=document.getElementById("overlay");
+  if(open){sb.classList.remove("-translate-x-full");ov.classList.remove("hidden");}
+  else{sb.classList.add("-translate-x-full");ov.classList.add("hidden");}
+}
+
+function showToast(message,type="success") {
+  const colors={success:"bg-emerald-600",error:"bg-red-600",info:"bg-slate-900"};
+  const el=document.createElement("div");
+  el.className=`flex items-center gap-3 rounded-xl ${colors[type]||colors.info} px-4 py-3 text-sm font-medium text-white shadow-xl`;
+  el.innerHTML=`${icon(type==="success"?"circle-check":type==="error"?"circle-alert":"info","h-5 w-5")}<span>${message}</span>`;
+  document.getElementById("toast-container").appendChild(el);
+  setTimeout(()=>el.remove(),3000);
+}
+
+function login() {
+  const pin=document.getElementById("login-pin").value;
+  const judge=document.getElementById("login-judge").value.trim();
+  if(pin==="1234" && judge){
+    state.currentJudge={id:judge,name:"Judge 01"};
+    document.getElementById("login-view").classList.add("hidden");
+    document.getElementById("app-view").classList.remove("hidden");
+    renderNav();renderPage();
+    showToast("Login successful.","success");
+    fetchParticipantsFromServer().then(() => fetchScoresFromServer());
+  } else {
+    showToast("Invalid Judge ID or PIN.","error");
+  }
+}
+
+function logout() {
+  document.getElementById("app-view").classList.add("hidden");
+  document.getElementById("login-view").classList.remove("hidden");
+  showToast("You have been logged out.","info");
+}
+
+renderNav();
+lucide.createIcons();
+</script>
+</body>
+</html>
