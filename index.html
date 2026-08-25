@@ -7,22 +7,17 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <style>
-body{font-family:Inter,ui-sans-serif,system-ui,sans-serif}
-.page{animation:fade .15s ease}
+body{font-family:Inter,system-ui,sans-serif}.page{animation:fade .15s ease}
 @keyframes fade{from{opacity:.3;transform:translateY(3px)}to{opacity:1;transform:none}}
 </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
+<div id="toast" class="fixed right-4 top-4 z-50 space-y-2"></div>
 
-<div id="toast" class="fixed right-4 top-4 z-[100] space-y-2"></div>
-
-<!-- LOGIN -->
-<div id="login" class="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+<section id="login" class="min-h-screen bg-slate-950 flex items-center justify-center p-6">
   <div class="w-full max-w-md">
     <div class="text-center text-white mb-8">
-      <div class="mx-auto mb-4 h-16 w-16 rounded-2xl bg-indigo-600 flex items-center justify-center">
-        <i data-lucide="mic-2" class="h-8 w-8"></i>
-      </div>
+      <div class="mx-auto mb-4 h-16 w-16 rounded-2xl bg-indigo-600 flex items-center justify-center"><i data-lucide="mic-2" class="h-8 w-8"></i></div>
       <h1 class="text-3xl font-bold">VocalScore</h1>
       <p class="mt-2 text-slate-400">Digital Vocal Competition Judging System</p>
     </div>
@@ -32,541 +27,158 @@ body{font-family:Inter,ui-sans-serif,system-ui,sans-serif}
       <input id="judgeId" value="J01" class="mt-2 w-full rounded-xl border px-4 py-3">
       <label class="block mt-4 text-sm font-medium">PIN</label>
       <input id="pin" type="password" value="1234" class="mt-2 w-full rounded-xl border px-4 py-3">
-      <button onclick="login()" class="mt-6 w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white">
-        Login
-      </button>
-      <p class="text-center text-xs text-slate-400 mt-4">Demo PIN: 1234</p>
+      <button onclick="login()" class="mt-6 w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white">Login</button>
     </div>
   </div>
-</div>
+</section>
 
-<!-- APP -->
-<div id="appShell" class="hidden min-h-screen">
-<aside id="side" class="fixed inset-y-0 left-0 z-40 w-72 bg-slate-950 text-white -translate-x-full lg:translate-x-0 transition-transform">
+<section id="app" class="hidden min-h-screen">
+<aside id="side" class="fixed inset-y-0 left-0 z-40 w-72 bg-slate-950 text-white -translate-x-full lg:translate-x-0">
   <div class="h-full flex flex-col">
     <div class="p-5 border-b border-white/10 flex items-center gap-3">
-      <div class="h-11 w-11 rounded-xl bg-indigo-600 flex items-center justify-center">
-        <i data-lucide="mic-2"></i>
-      </div>
-      <div>
-        <b>VocalScore</b>
-        <div class="text-xs text-slate-400">Digital Judging System</div>
-      </div>
+      <div class="h-11 w-11 rounded-xl bg-indigo-600 flex items-center justify-center"><i data-lucide="mic-2"></i></div>
+      <div><b>VocalScore</b><div class="text-xs text-slate-400">Digital Judging System</div></div>
     </div>
-    <nav id="nav" class="flex-1 p-3 overflow-y-auto"></nav>
-    <div class="p-4 border-t border-white/10 text-sm">
-      Judge 01 <span class="float-right text-emerald-400">Online</span>
-    </div>
+    <nav id="nav" class="p-3 flex-1"></nav>
+    <div class="p-4 border-t border-white/10 text-sm">Judge 01 <span class="float-right text-emerald-400">Online</span></div>
   </div>
 </aside>
 
 <div class="lg:pl-72">
 <header class="h-16 bg-white border-b flex items-center justify-between px-4 sm:px-6 sticky top-0 z-20">
-  <div class="flex items-center gap-3">
-    <button class="lg:hidden" onclick="toggleSide()"><i data-lucide="menu"></i></button>
-    <b>VocalScore</b>
-  </div>
-  <span id="serverState" class="text-xs rounded-full bg-amber-50 text-amber-700 px-3 py-1">
-    Connecting...
-  </span>
+  <div class="flex items-center gap-3"><button class="lg:hidden" onclick="toggleSide()"><i data-lucide="menu"></i></button><b>VocalScore</b></div>
+  <span id="status" class="text-xs rounded-full bg-amber-50 text-amber-700 px-3 py-1">Connecting...</span>
 </header>
 <main id="main" class="p-4 sm:p-6 lg:p-8"></main>
 </div>
-</div>
+</section>
 
 <script>
-/*
- * VocalScore 2.2
- * Frontend: GitHub Pages
- * Backend: Google Apps Script
- *
- * Two API addresses are kept:
- * 1. Stable Apps Script /exec URL
- * 2. Existing googleusercontent deployment URL as fallback
- */
-const API_URLS = [
-  'https://script.google.com/macros/s/AKfycbzcXZdfN65nUdAyCHWPddvn1-H0HRtoxf2uly3pJGFoTjN5OlQrMc4fJFfZSHKH7vov/exec',
-  'https://script.googleusercontent.com/a/macros/moe-dl.edu.my/echo?user_content_key=AUkAhnT8vZf7UR3gJZD6CztHpYC_Git5OSPWS8DpZuVYO8JPKdGz2veauPHfBIIVF_El4v36WrZeWViWQ8YezdeUHKDuSGEDHMgEOhhqU_30HDveuCmusLG5GKdAs5fSZ8q8qubi5XHEHlxQN96ljJ0Os0Isyiss6AwVChjORw3rTFn8ttnIhlvReOIRHHzynZeNfpNUW9UF50IrFGqmJd7Lb8XXpC-D5PmW-iWCLP0WW9vlbt167cBpTIsXzmeXVyhXQq0bQ2E_KDGJuQ3Q0uOwIvdfPe9EuoYuFeIJ10j3Szp7TrGTC-ZgF3G9wByqzcSS1lxtuBCQ&lib=MDfLeraXOtY7tRs1IQzwEPjimZkoIcWwo'
-];
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzcXZdfN65nUdAyCHWPddvn1-H0HRtoxf2uly3pJGFoTjN5OlQrMc4fJFfZSHKH7vov/exec';
+const state={page:'dashboard',judgeId:'J01',participants:[],scores:[]};
 
-const state={
-  page:'dashboard',
-  judgeId:'J01',
-  participants:[],
-  scores:[],
-  server:false
-};
+function gas(action, params, done){
+  const cb='vocalScoreCallback_'+Date.now()+'_'+Math.floor(Math.random()*10000);
+  const script=document.createElement('script');
+  let finished=false;
+  const cleanup=()=>{try{delete window[cb]}catch(e){};script.remove()};
+  const timer=setTimeout(()=>{if(finished)return;finished=true;cleanup();done({success:false,message:'GAS request timed out.'})},12000);
 
-const navGroups=[
-  ['MAIN',[['dashboard','Dashboard','layout-dashboard']]],
-  ['COMPETITION',[['participants','Participants','users'],['events','Events','calendar-days'],['judges','Judges','gavel']]],
-  ['JUDGING',[['judging','Judging','clipboard-pen-line'],['scores','Score Records','file-check-2']]],
-  ['RESULTS',[['results','Results','trophy'],['ranking','Ranking','medal'],['analytics','Analytics','chart-column']]]
-];
+  window[cb]=(data)=>{
+    if(finished)return;
+    finished=true;clearTimeout(timer);cleanup();done(data);
+  };
 
-/* JSONP request with automatic API fallback */
-function req(action, params={}, cb){
-  let index=0;
+  script.onerror=()=>{
+    if(finished)return;
+    finished=true;clearTimeout(timer);cleanup();
+    done({success:false,message:'Unable to reach VocalScore Server.'});
+  };
 
-  function attempt(){
-    if(index>=API_URLS.length){
-      cb({success:false,message:'Unable to reach VocalScore Server. Please check the Google Apps Script deployment.'});
-      return;
-    }
-
-    const base=API_URLS[index++];
-    const callback='vs_cb_'+Date.now()+'_'+Math.floor(Math.random()*10000);
-
-    let finished=false;
-    const script=document.createElement('script');
-
-    const cleanup=()=>{
-      try{delete window[callback]}catch(e){}
-      if(script.parentNode)script.parentNode.removeChild(script);
-    };
-
-    const timeout=setTimeout(()=>{
-      if(finished)return;
-      finished=true;
-      cleanup();
-      attempt();
-    },10000);
-
-    window[callback]=(data)=>{
-      if(finished)return;
-      finished=true;
-      clearTimeout(timeout);
-      cleanup();
-      cb(data);
-    };
-
-    script.onerror=()=>{
-      if(finished)return;
-      finished=true;
-      clearTimeout(timeout);
-      cleanup();
-      attempt();
-    };
-
-    const qs=new URLSearchParams({
-      action:String(action),
-      callback:callback
-    });
-
-    Object.keys(params||{}).forEach(k=>{
-      qs.set(k,params[k]===undefined||params[k]===null?'':String(params[k]));
-    });
-
-    script.src=base+(base.includes('?')?'&':'?')+qs.toString();
-    document.body.appendChild(script);
-  }
-
-  attempt();
+  const q=new URLSearchParams({action,callback:cb});
+  Object.entries(params||{}).forEach(([k,v])=>q.set(k,v??''));
+  script.src=GAS_URL+'?'+q.toString();
+  document.body.appendChild(script);
 }
 
 function login(){
-  const pin=document.getElementById('pin').value;
-  if(pin!=='1234'){
-    toast('Invalid PIN','error');
-    return;
-  }
-
+  if(document.getElementById('pin').value!=='1234'){toast('Invalid PIN','error');return}
   state.judgeId=document.getElementById('judgeId').value.trim()||'J01';
   document.getElementById('login').classList.add('hidden');
-  document.getElementById('appShell').classList.remove('hidden');
-
-  renderNav();
-  go('dashboard');
-  loadAll();
+  document.getElementById('app').classList.remove('hidden');
+  nav();go('dashboard');loadData();
 }
 
-function loadAll(){
-  setServerState('Connecting...','amber');
-
-  req('participants',{},d=>{
-    if(!d || !d.success){
-      setServerState('Server Error','red');
-      toast(d?.message||'Unable to load participants.','error');
-      return;
-    }
-
-    state.participants=(d.participants||[]).map(p=>({
-      id:String(p.ParticipantID||''),
-      bib:String(p.BIB||''),
-      name:String(p.Name||''),
-      category:String(p.Category||''),
-      status:String(p.Status||'').toLowerCase()==='active'?'pending':'pending'
+function loadData(){
+  setStatus('Connecting...','amber');
+  gas('participants',{},p=>{
+    if(!p.success){setStatus('Server Error','red');toast(p.message,'error');return}
+    state.participants=(p.participants||[]).map(x=>({
+      id:String(x.ParticipantID||''),bib:String(x.BIB||''),name:String(x.Name||''),
+      category:String(x.Category||''),status:'pending'
     }));
 
-    req('scores',{judgeId:state.judgeId},s=>{
-      if(!s || !s.success){
-        setServerState('Server Error','red');
-        toast(s?.message||'Unable to load scores.','error');
-        return;
-      }
-
-      state.scores=s.scores||[];
-
-      state.participants.forEach(p=>{
-        if(state.scores.some(x=>String(x.participantId)===String(p.id))){
-          p.status='completed';
-        }
-      });
-
-      state.server=true;
-      setServerState('Server Connected','green');
-      render();
+    gas('scores',{judgeId:state.judgeId},s=>{
+      state.scores=s.success?(s.scores||[]):[];
+      state.participants.forEach(p=>{if(state.scores.some(x=>String(x.participantId)===p.id))p.status='completed'});
+      setStatus('Server Connected','green');render();
     });
   });
 }
 
-function setServerState(text,color){
-  const e=document.getElementById('serverState');
-  if(!e)return;
-
-  if(color==='green'){
-    e.className='text-xs rounded-full bg-emerald-50 text-emerald-700 px-3 py-1';
-  }else if(color==='red'){
-    e.className='text-xs rounded-full bg-red-50 text-red-700 px-3 py-1';
-  }else{
-    e.className='text-xs rounded-full bg-amber-50 text-amber-700 px-3 py-1';
-  }
-
-  e.textContent=text;
+function setStatus(t,c){
+  const e=document.getElementById('status');
+  e.textContent=t;
+  e.className='text-xs rounded-full px-3 py-1 '+(c==='green'?'bg-emerald-50 text-emerald-700':c==='red'?'bg-red-50 text-red-700':'bg-amber-50 text-amber-700');
 }
 
-function renderNav(){
-  document.getElementById('nav').innerHTML=navGroups.map(([g,items])=>`
-    <div class="mt-5 mb-2 px-3 text-[11px] uppercase tracking-widest text-slate-500">${g}</div>
-    ${items.map(([id,label,ico])=>`
-      <button onclick="go('${id}')"
-        class="navbtn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm ${state.page===id?'bg-indigo-600':'text-slate-300 hover:bg-white/5'}">
-        ${ic(ico)}${label}
-      </button>
-    `).join('')}
-  `).join('');
-
-  lucide.createIcons();
-}
-
-function go(p){
-  state.page=p;
-  renderNav();
-  render();
-  document.getElementById('side').classList.add('-translate-x-full');
-}
-
-function render(){
-  const f={
-    dashboard,
-    participants,
-    events,
-    judges,
-    judging,
-    scores,
-    results,
-    ranking,
-    analytics
-  };
-
-  document.getElementById('main').innerHTML=
-    '<div class="page">'+(f[state.page]||dashboard)()+'</div>';
-
-  lucide.createIcons();
-}
-
-function ic(n){
-  return `<i data-lucide="${n}" class="h-5 w-5"></i>`;
-}
-
-function header(t,s){
-  return `
-  <div class="mb-6">
-    <h1 class="text-2xl font-bold">${t}</h1>
-    <p class="text-sm text-slate-500 mt-1">${s}</p>
-  </div>`;
-}
-
-function card(t,v,i){
-  return `
-  <div class="bg-white border rounded-2xl p-5 shadow-sm">
-    <div class="flex justify-between">
-      <div>
-        <p class="text-sm text-slate-500">${t}</p>
-        <p class="text-3xl font-bold mt-2">${v}</p>
-      </div>
-      <div class="h-11 w-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-        ${ic(i)}
-      </div>
-    </div>
-  </div>`;
-}
-
-function badge(s){
-  return `<span class="rounded-full px-2.5 py-1 text-xs font-semibold ${
-    s==='completed'
-      ? 'bg-emerald-50 text-emerald-700'
-      : 'bg-amber-50 text-amber-700'
-  }">${s==='completed'?'Completed':'Pending'}</span>`;
-}
-
-function dashboard(){
-  const done=state.participants.filter(p=>p.status==='completed').length;
-  const avg=state.scores.length
-    ?(state.scores.reduce((a,s)=>a+Number(s.total||0),0)/state.scores.length).toFixed(1)
-    :'0.0';
-
-  return header('Dashboard','Welcome back, Judge 01.')+
-  `<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    ${card('Total Participants',state.participants.length,'users')}
-    ${card('Completed Judging',done,'circle-check')}
-    ${card('Pending Judging',state.participants.length-done,'clock-3')}
-    ${card('Average Score',avg,'chart-column')}
-  </div>
-  <div class="mt-6 bg-white border rounded-2xl p-6 shadow-sm">
-    <h2 class="font-semibold">Current Event</h2>
-    <p class="text-sm text-slate-500 mt-1">Vocal Competition 2026 · Solo Open</p>
-  </div>`;
-}
-
-function participants(){
-  return header('Participants','Participants loaded from the VocalScore server.')+
-  `<div class="bg-white border rounded-2xl shadow-sm overflow-hidden">
-    <div class="p-4 border-b flex justify-between">
-      <b>Participant List</b>
-      <button onclick="loadAll()" class="text-indigo-600 font-semibold">Refresh</button>
-    </div>
-    ${tableParticipants()}
-  </div>`;
-}
-
-function tableParticipants(){
-  return `
-  <div class="overflow-x-auto">
-  <table class="w-full text-left text-sm">
-    <thead class="bg-slate-50 text-xs uppercase text-slate-500">
-      <tr>
-        <th class="px-5 py-3">BIB</th>
-        <th class="px-5 py-3">Participant</th>
-        <th class="px-5 py-3">Category</th>
-        <th class="px-5 py-3">Status</th>
-        <th class="px-5 py-3">Action</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y">
-      ${state.participants.map(p=>`
-      <tr>
-        <td class="px-5 py-4 font-bold">${p.bib}</td>
-        <td class="px-5 py-4 font-semibold">${p.name}</td>
-        <td class="px-5 py-4">${p.category}</td>
-        <td class="px-5 py-4">${badge(p.status)}</td>
-        <td class="px-5 py-4">
-          <button onclick="startJudge('${p.id}')" class="text-indigo-600 font-semibold">Judge</button>
-        </td>
-      </tr>`).join('')}
-    </tbody>
-  </table>
-  </div>`;
-}
-
-function startJudge(id){
-  state.page='judging';
-  renderNav();
-  render();
-
-  setTimeout(()=>{
-    const s=document.getElementById('participant');
-    if(s){
-      s.value=id;
-      loadExisting();
-    }
-  },50);
-}
-
-function judging(){
-  return header('Judging','Enter and submit your score.')+
-  `<div class="grid gap-6 xl:grid-cols-3">
-    <div class="xl:col-span-2 bg-white border rounded-2xl p-6 shadow-sm">
-      <label class="text-sm font-medium">Participant</label>
-      <select id="participant" onchange="loadExisting()" class="mt-2 w-full border rounded-xl px-4 py-3">
-        <option value="">-- Select Participant --</option>
-        ${state.participants.map(p=>`
-          <option value="${p.id}">${p.bib} — ${p.name}</option>
-        `).join('')}
-      </select>
-      <div id="form" class="mt-6"></div>
-    </div>
-
-    <div class="bg-white border rounded-2xl p-6 shadow-sm h-fit">
-      <p class="text-sm text-slate-500">Total Score</p>
-      <div id="total" class="text-5xl font-bold mt-2">
-        0<span class="text-xl text-slate-400"> / 100</span>
-      </div>
-      <div class="mt-4 h-2 bg-slate-100 rounded">
-        <div id="bar" class="h-2 bg-indigo-600 rounded" style="width:0%"></div>
-      </div>
-    </div>
-  </div>`;
-}
-
-const criteria=[
-  ['pitch','Pitch',20],
-  ['vocalQuality','Vocal Quality',25],
-  ['rhythm','Rhythm',20],
-  ['expression','Expression',20],
-  ['stagePresence','Stage Presence',15]
+const groups=[
+ ['MAIN',[['dashboard','Dashboard','layout-dashboard']]],
+ ['COMPETITION',[['participants','Participants','users'],['events','Events','calendar-days'],['judges','Judges','gavel']]],
+ ['JUDGING',[['judging','Judging','clipboard-pen-line'],['scores','Score Records','file-check-2']]],
+ ['RESULTS',[['results','Results','trophy'],['ranking','Ranking','medal'],['analytics','Analytics','chart-column']]]
 ];
 
-function loadExisting(){
-  const id=document.getElementById('participant').value;
-
-  if(!id){
-    document.getElementById('form').innerHTML='';
-    calc();
-    return;
-  }
-
-  const s=state.scores.find(x=>String(x.participantId)===String(id));
-
-  document.getElementById('form').innerHTML=`
-    <div class="grid sm:grid-cols-2 gap-4">
-      ${criteria.map(c=>`
-      <label class="text-sm font-medium">
-        ${c[1]} <span class="text-slate-400">(max ${c[2]})</span>
-        <input id="sc_${c[0]}"
-          type="number"
-          min="0"
-          max="${c[2]}"
-          value="${s?s[c[0]]:''}"
-          oninput="calc()"
-          class="mt-2 w-full border rounded-xl px-4 py-3 text-lg">
-      </label>`).join('')}
-    </div>
-
-    <label class="block mt-5 text-sm font-medium">
-      Judge's Comments
-      <textarea id="comments" rows="4" class="mt-2 w-full border rounded-xl px-4 py-3">${s?s.comments||'':''}</textarea>
-    </label>
-
-    <button onclick="saveScore()"
-      class="mt-5 w-full rounded-xl bg-indigo-600 text-white py-3 font-semibold">
-      Save Score
-    </button>`;
-
-  calc();
+function nav(){
+ document.getElementById('nav').innerHTML=groups.map(([g,items])=>`
+ <div class="mt-5 mb-2 px-3 text-[11px] uppercase tracking-widest text-slate-500">${g}</div>
+ ${items.map(([id,label,ico])=>`<button onclick="go('${id}')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm ${state.page===id?'bg-indigo-600':'text-slate-300 hover:bg-white/5'}">${icon(ico)}${label}</button>`).join('')}`).join('');
+ lucide.createIcons();
 }
-
-function calc(){
-  let t=0;
-
-  criteria.forEach(c=>{
-    t+=Number(document.getElementById('sc_'+c[0])?.value)||0;
-  });
-
-  const e=document.getElementById('total');
-  if(e)e.innerHTML=t+'<span class="text-xl text-slate-400"> / 100</span>';
-
-  const b=document.getElementById('bar');
-  if(b)b.style.width=Math.min(100,t)+'%';
+function icon(x){return `<i data-lucide="${x}" class="h-5 w-5"></i>`}
+function go(p){state.page=p;nav();render();document.getElementById('side').classList.add('-translate-x-full')}
+function header(a,b){return `<div class="mb-6"><h1 class="text-2xl font-bold">${a}</h1><p class="text-sm text-slate-500 mt-1">${b}</p></div>`}
+function render(){
+ const f={dashboard,participants,judging,scores,events,judges,results,ranking,analytics};
+ document.getElementById('main').innerHTML='<div class="page">'+f[state.page]()+'</div>';
+ lucide.createIcons();
 }
-
+function card(a,b,c){return `<div class="bg-white border rounded-2xl p-5 shadow-sm"><p class="text-sm text-slate-500">${a}</p><p class="text-3xl font-bold mt-2">${b}</p></div>`}
+function dashboard(){
+ const done=state.participants.filter(p=>p.status==='completed').length;
+ return header('Dashboard','Welcome back, Judge 01.')+`<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">${card('Participants',state.participants.length)}${card('Completed',done)}${card('Pending',state.participants.length-done)}${card('Scores',state.scores.length)}</div>`;
+}
+function participants(){
+ return header('Participants','Loaded directly from Google Apps Script.')+
+ `<div class="bg-white border rounded-2xl overflow-hidden"><div class="p-4 border-b flex justify-between"><b>Participant List</b><button onclick="loadData()" class="text-indigo-600 font-semibold">Refresh</button></div>
+ <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50"><tr><th class="p-4">BIB</th><th class="p-4">Participant</th><th class="p-4">Category</th><th class="p-4">Status</th><th class="p-4"></th></tr></thead><tbody class="divide-y">
+ ${state.participants.map(p=>`<tr><td class="p-4 font-bold">${p.bib}</td><td class="p-4 font-semibold">${p.name}</td><td class="p-4">${p.category}</td><td class="p-4">${p.status}</td><td class="p-4"><button onclick="judge('${p.id}')" class="text-indigo-600 font-semibold">Judge</button></td></tr>`).join('')}
+ </tbody></table></div></div>`;
+}
+const criteria=[['pitch','Pitch',20],['vocalQuality','Vocal Quality',25],['rhythm','Rhythm',20],['expression','Expression',20],['stagePresence','Stage Presence',15]];
+function judging(){
+ return header('Judging','Enter scores and save them to Google Sheets.')+
+ `<div class="bg-white border rounded-2xl p-6 max-w-4xl">
+ <label class="text-sm font-medium">Participant</label>
+ <select id="participant" onchange="loadScore()" class="mt-2 w-full border rounded-xl px-4 py-3"><option value="">-- Select Participant --</option>${state.participants.map(p=>`<option value="${p.id}">${p.bib} — ${p.name}</option>`).join('')}</select>
+ <div id="scoreForm"></div></div>`;
+}
+function judge(id){state.page='judging';nav();render();setTimeout(()=>{document.getElementById('participant').value=id;loadScore()},50)}
+function loadScore(){
+ const id=document.getElementById('participant').value;if(!id){document.getElementById('scoreForm').innerHTML='';return}
+ const old=state.scores.find(x=>String(x.participantId)===id);
+ document.getElementById('scoreForm').innerHTML=`<div class="grid sm:grid-cols-2 gap-4 mt-6">${criteria.map(c=>`<label class="text-sm font-medium">${c[1]} (max ${c[2]})<input id="s_${c[0]}" type="number" min="0" max="${c[2]}" value="${old?old[c[0]]:''}" oninput="total()" class="mt-2 w-full border rounded-xl px-4 py-3"></label>`).join('')}</div>
+ <label class="block mt-5 text-sm font-medium">Comments<textarea id="comments" rows="4" class="mt-2 w-full border rounded-xl px-4 py-3">${old?old.comments||'':''}</textarea></label>
+ <div class="mt-5 flex items-center justify-between"><b>Total: <span id="total">0</span> / 100</b><button onclick="saveScore()" class="rounded-xl bg-indigo-600 text-white px-6 py-3 font-semibold">Save Score</button></div>`;
+ total();
+}
+function total(){let n=0;criteria.forEach(c=>n+=Number(document.getElementById('s_'+c[0])?.value)||0);const e=document.getElementById('total');if(e)e.textContent=n}
 function saveScore(){
-  const pid=document.getElementById('participant').value;
-
-  if(!pid){
-    toast('Please select a participant.','error');
-    return;
-  }
-
-  const vals={};
-  let total=0;
-
-  for(const c of criteria){
-    const n=Number(document.getElementById('sc_'+c[0]).value);
-
-    if(!Number.isFinite(n)||n<0||n>c[2]){
-      toast(c[1]+' must be between 0 and '+c[2]+'.','error');
-      return;
-    }
-
-    vals[c[0]]=n;
-    total+=n;
-  }
-
-  const btn=document.querySelector('#form button');
-
-  if(btn){
-    btn.disabled=true;
-    btn.textContent='Saving...';
-  }
-
-  req('saveScore',{
-    judgeId:state.judgeId,
-    participantId:pid,
-    pitch:vals.pitch,
-    vocalQuality:vals.vocalQuality,
-    rhythm:vals.rhythm,
-    expression:vals.expression,
-    stagePresence:vals.stagePresence,
-    comments:document.getElementById('comments').value
-  },d=>{
-    if(!d || !d.success){
-      toast(d?.message||'Unable to save score.','error');
-
-      if(btn){
-        btn.disabled=false;
-        btn.textContent='Save Score';
-      }
-      return;
-    }
-
-    toast('Score saved successfully.','success');
-    loadAll();
-  });
+ const participantId=document.getElementById('participant').value;
+ if(!participantId){toast('Please select a participant.','error');return}
+ const v={};for(const c of criteria){const n=Number(document.getElementById('s_'+c[0]).value);if(!Number.isFinite(n)||n<0||n>c[2]){toast(c[1]+' must be between 0 and '+c[2]+'.','error');return}v[c[0]]=n}
+ const btn=document.querySelector('#scoreForm button');btn.disabled=true;btn.textContent='Saving...';
+ gas('saveScore',{judgeId:state.judgeId,participantId,pitch:v.pitch,vocalQuality:v.vocalQuality,rhythm:v.rhythm,expression:v.expression,stagePresence:v.stagePresence,comments:document.getElementById('comments').value},r=>{
+   if(!r.success){toast(r.message||'Unable to save score.','error');btn.disabled=false;btn.textContent='Save Score';return}
+   toast('Score saved successfully.','success');loadData();
+ });
 }
-
-function scores(){
-  return header('Score Records','Scores stored on the VocalScore server.')+
-  `<div class="bg-white border rounded-2xl shadow-sm overflow-x-auto">
-    <table class="w-full text-left text-sm">
-      <thead class="bg-slate-50 text-xs uppercase text-slate-500">
-        <tr>
-          <th class="px-5 py-3">Participant</th>
-          <th class="px-5 py-3">Judge</th>
-          <th class="px-5 py-3">Total</th>
-          <th class="px-5 py-3">Status</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y">
-        ${state.scores.map(s=>{
-          const p=state.participants.find(x=>String(x.id)===String(s.participantId));
-          return `<tr>
-            <td class="px-5 py-4 font-semibold">${p?p.name:s.participantId}</td>
-            <td class="px-5 py-4">${s.judgeId||''}</td>
-            <td class="px-5 py-4 font-bold">${s.total||0}</td>
-            <td class="px-5 py-4">${badge('completed')}</td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>
-  </div>`;
-}
-
-function results(){return header('Results','Current competition results.')+scores()}
-function ranking(){return header('Ranking','Current ranking by average score.')+scores()}
-function analytics(){return header('Analytics','Scoring overview.')+scores()}
+function scores(){return header('Score Records','Saved scores from Google Sheets.')+`<div class="bg-white border rounded-2xl overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50"><tr><th class="p-4">Participant</th><th class="p-4">Judge</th><th class="p-4">Total</th></tr></thead><tbody class="divide-y">${state.scores.map(s=>`<tr><td class="p-4">${state.participants.find(p=>p.id===String(s.participantId))?.name||s.participantId}</td><td class="p-4">${s.judgeId}</td><td class="p-4 font-bold">${s.total}</td></tr>`).join('')}</tbody></table></div>`}
 function events(){return header('Events','Competition events.')+'<div class="bg-white border rounded-2xl p-6">Vocal Competition 2026 · Solo Open</div>'}
 function judges(){return header('Judges','Judging panel.')+'<div class="bg-white border rounded-2xl p-6">Judge 01 · Active</div>'}
+function results(){return scores()}function ranking(){return scores()}function analytics(){return scores()}
 function toggleSide(){document.getElementById('side').classList.toggle('-translate-x-full')}
-
-function toast(msg,type='success'){
-  const e=document.createElement('div');
-  e.className='rounded-xl px-4 py-3 text-white shadow-xl '+(type==='error'?'bg-red-600':'bg-emerald-600');
-  e.textContent=msg;
-  document.getElementById('toast').appendChild(e);
-  setTimeout(()=>e.remove(),3500);
-}
-
+function toast(m,t='success'){const e=document.createElement('div');e.className='rounded-xl px-4 py-3 text-white shadow-xl '+(t==='error'?'bg-red-600':'bg-emerald-600');e.textContent=m;document.getElementById('toast').appendChild(e);setTimeout(()=>e.remove(),3500)}
 lucide.createIcons();
 </script>
 </body>
