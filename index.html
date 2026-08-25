@@ -146,6 +146,37 @@
 </div>
 
 <script>
+const API_URL = 'https://script.googleusercontent.com/a/macros/moe-dl.edu.my/echo?user_content_key=AUkAhnT8vZf7UR3gJZD6CztHpYC_Git5OSPWS8DpZuVYO8JPKdGz2veauPHfBIIVF_El4v36WrZeWViWQ8YezdeUHKDuSGEDHMgEOhhqU_30HDveuCmusLG5GKdAs5fSZ8q8qubi5XHEHlxQN96ljJ0Os0Isyiss6AwVChjORw3rTFn8ttnIhlvReOIRHHzynZeNfpNUW9UF50IrFGqmJd7Lb8XXpC-D5PmW-iWCLP0WW9vlbt167cBpTIsXzmeXVyhXQq0bQ2E_KDGJuQ3Q0uOwIvdfPe9EuoYuFeIJ10j3Szp7TrGTC-ZgF3G9wByqzcSS1lxtuBCQ&lib=MDfLeraXOtY7tRs1IQzwEPjimZkoIcWwo';
+
+async function fetchParticipantsFromServer() {
+  try {
+    const separator = API_URL.includes('?') ? '&' : '?';
+    const response = await fetch(API_URL + separator + 'action=participants', {
+      method: 'GET',
+      cache: 'no-store'
+    });
+    if (!response.ok) throw new Error('Server returned HTTP ' + response.status);
+    const data = await response.json();
+    if (!data.success) throw new Error(data.message || 'Unable to load participants.');
+
+    state.participants = (data.participants || []).map(p => ({
+      id: String(p.ParticipantID || p.participantId || ''),
+      bib: String(p.BIB ?? p.Bib ?? p.bib ?? ''),
+      name: String(p.Name || p.name || ''),
+      category: String(p.Category || p.category || ''),
+      status: String(p.Status || p.status || 'ACTIVE').toLowerCase() === 'active' ? 'pending' : String(p.Status || p.status || 'pending').toLowerCase()
+    }));
+
+    state.serverOnline = true;
+    state.lastSync = new Date();
+    showToast(`Loaded ${state.participants.length} participants from server.`, 'success');
+    renderPage();
+  } catch (error) {
+    state.serverOnline = false;
+    showToast('Could not load participants from server: ' + error.message, 'error');
+  }
+}
+
 const state = {
   currentPage: "dashboard",
   currentJudge: { id: "J01", name: "Judge 01" },
@@ -157,6 +188,8 @@ const state = {
     {id:"V005", bib:"005", name:"Sarah", category:"Solo", status:"pending"},
     {id:"V006", bib:"006", name:"Michael", category:"Solo", status:"pending"}
   ],
+  serverOnline: false,
+  lastSync: null,
   scores: [
     {id:"S001", participantId:"V002", judgeId:"J01", pitch:17, vocalQuality:22, rhythm:17, expression:16, stagePresence:12, comments:"Good control and confident delivery."},
     {id:"S002", participantId:"V003", judgeId:"J01", pitch:18, vocalQuality:23, rhythm:18, expression:17, stagePresence:13, comments:"Strong overall performance."}
@@ -317,7 +350,7 @@ function pageDashboard() {
       <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div class="flex items-center gap-3">
           <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">${icon("wifi","h-5 w-5")}</div>
-          <div><div class="text-sm font-semibold">System Status</div><div class="text-xs text-emerald-600">All systems operational</div></div>
+          <div><div class="text-sm font-semibold">System Status</div><div class="text-xs ${state.serverOnline ? "text-emerald-600" : "text-amber-600"}">${state.serverOnline ? "Server connected" : "Waiting for server"}</div></div>
         </div>
       </div>
       <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -378,10 +411,17 @@ function statusBadge(status) {
 function pageParticipants() {
   return `
     ${pageHeader("Participants","Manage registered participants.",
-      `<button onclick="showToast('Participant creation will be connected to the server in Phase 2.','info')" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">${icon("plus","h-4 w-4")} Add Participant</button>`)}
+      `<div class="flex gap-2">
+        <button onclick="fetchParticipantsFromServer()" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-50">${icon("refresh-cw","h-4 w-4")} Refresh</button>
+        <button onclick="showToast('Participant creation will be connected to the server in the next phase.','info')" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">${icon("plus","h-4 w-4")} Add Participant</button>
+      </div>`)}
     <div class="mb-4 flex flex-col gap-3 sm:flex-row">
       <div class="relative flex-1">${icon("search","absolute left-3 top-3 h-5 w-5 text-slate-400")}<input id="participant-search" oninput="filterParticipants()" placeholder="Search participant..." class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 outline-none focus:border-indigo-500"></div>
       <select id="participant-status" onchange="filterParticipants()" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 outline-none"><option value="">All Status</option><option value="pending">Pending</option><option value="completed">Completed</option></select>
+    </div>
+    <div class="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+      <span class="flex items-center gap-2">${icon(state.serverOnline ? "cloud-check" : "cloud-off","h-4 w-4")} ${state.serverOnline ? "Connected to VocalScore Server" : "Server not connected"}</span>
+      <span>${state.lastSync ? "Last sync: " + state.lastSync.toLocaleTimeString() : ""}</span>
     </div>
     <div id="participants-table" class="rounded-2xl border border-slate-200 bg-white shadow-sm">${participantTable(state.participants)}</div>`;
 }
@@ -596,6 +636,7 @@ function login() {
     document.getElementById("app-view").classList.remove("hidden");
     renderNav();renderPage();
     showToast("Login successful.","success");
+    fetchParticipantsFromServer();
   } else {
     showToast("Invalid Judge ID or PIN.","error");
   }
