@@ -176,6 +176,34 @@ async function fetchParticipantsFromServer() {
     showToast('Could not load participants from server: ' + error.message, 'error');
   }
 }
+async function fetchScoresFromServer() {
+  try {
+    const separator = API_URL.includes('?') ? '&' : '?';
+    const response = await fetch(API_URL + separator + 'action=scores&judgeId=' + encodeURIComponent(state.currentJudge.id), {
+      method: 'GET',
+      cache: 'no-store'
+    });
+    if (!response.ok) throw new Error('Server returned HTTP ' + response.status);
+    const data = await response.json();
+    if (!data.success) throw new Error(data.message || 'Unable to load scores.');
+
+    state.scores = data.scores || [];
+
+    // Update current judge's participant status from real saved scores.
+    state.participants.forEach(p => {
+      const hasScore = state.scores.some(s => s.participantId === p.id && s.judgeId === state.currentJudge.id);
+      p.status = hasScore ? 'completed' : 'pending';
+    });
+
+    state.serverOnline = true;
+    state.lastSync = new Date();
+    renderPage();
+  } catch (error) {
+    state.serverOnline = false;
+    showToast('Could not load scores from server: ' + error.message, 'error');
+  }
+}
+
 
 const state = {
   currentPage: "dashboard",
@@ -190,10 +218,7 @@ const state = {
   ],
   serverOnline: false,
   lastSync: null,
-  scores: [
-    {id:"S001", participantId:"V002", judgeId:"J01", pitch:17, vocalQuality:22, rhythm:17, expression:16, stagePresence:12, comments:"Good control and confident delivery."},
-    {id:"S002", participantId:"V003", judgeId:"J01", pitch:18, vocalQuality:23, rhythm:18, expression:17, stagePresence:13, comments:"Strong overall performance."}
-  ]
+  scores: []
 };
 
 const criteria = [
@@ -522,36 +547,92 @@ function clearScoreForm() {
   updateTotal();
 }
 
-function saveScore() {
-  const participantId=document.getElementById("judge-participant")?.value;
-  if(!participantId){showToast("Please select a participant.","error");return;}
-  const values={};
-  let total=0;
-  for(const c of criteria){
-    const el=document.getElementById("score-"+c.key);
-    const value=Number(el?.value);
-    if(!Number.isFinite(value)||value<0||value>c.max){showToast(`Please enter a valid ${c.label} score. Maximum is ${c.max}.`,"error");el?.focus();return;}
-    values[c.key]=value; total+=value;
+async function saveScore() {
+  const participantId = document.getElementById("judge-participant")?.value;
+  if (!participantId) {
+    showToast("Please select a participant.", "error");
+    return;
   }
-  const comments=document.getElementById("judge-comments")?.value||"";
-  const existing=state.scores.find(x=>x.participantId===participantId&&x.judgeId===state.currentJudge.id);
-  if(existing) Object.assign(existing,values,{comments,total});
-  else state.scores.push({id:"S"+Date.now(),participantId,judgeId:state.currentJudge.id,...values,comments,total});
-  const p=state.participants.find(x=>x.id===participantId); if(p)p.status="completed";
-  showToast("Score saved successfully.","success");
-  setTimeout(()=>renderPage(),250);
+
+  const values = {};
+  let total = 0;
+
+  for (const c of criteria) {
+    const el = document.getElementById("score-" + c.key);
+    const value = Number(el?.value);
+    if (!Number.isFinite(value) || value < 0 || value > c.max) {
+      showToast(`Please enter a valid ${c.label} score. Maximum is ${c.max}.`, "error");
+      el?.focus();
+      return;
+    }
+    values[c.key] = value;
+    total += value;
+  }
+
+  const comments = document.getElementById("judge-comments")?.value || "";
+
+  const button = document.querySelector('button[onclick="saveScore()"]');
+  if (button) {
+    button.disabled = true;
+    button.classList.add("opacity-60", "cursor-not-allowed");
+  }
+
+  try {
+    const params = new URLSearchParams({
+      action: "saveScore",
+      judgeId: state.currentJudge.id,
+      participantId,
+      pitch: values.pitch,
+      vocalQuality: values.vocalQuality,
+      rhythm: values.rhythm,
+      expression: values.expression,
+      stagePresence: values.stagePresence,
+      comments
+    });
+
+    const separator = API_URL.includes("?") ? "&" : "?";
+    const response = await fetch(API_URL + separator + params.toString(), {
+      method: "GET",
+      cache: "no-store"
+    });
+
+    if (!response.ok) throw new Error("Server returned HTTP " + response.status);
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.message || "Unable to save score.");
+    }
+
+    showToast("Score saved to server successfully.", "success");
+
+    await fetchScoresFromServer();
+
+    const select = document.getElementById("judge-participant");
+    if (select) {
+      select.value = participantId;
+      loadParticipant();
+    }
+  } catch (error) {
+    showToast("Score was not saved: " + error.message, "error");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.classList.remove("opacity-60", "cursor-not-allowed");
+    }
+  }
 }
 
 function scoreTotal(s){return criteria.reduce((sum,c)=>sum+(Number(s[c.key])||0),0);}
 
 function pageScores() {
   return `
-    ${pageHeader("Score Records","Review submitted scores.")}
+    ${pageHeader("Score Records","Review submitted scores.", `<button onclick="fetchScoresFromServer()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-50">${icon("refresh-cw","h-4 w-4")} Refresh</button>`)}
     <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       <div class="overflow-x-auto"><table class="w-full text-left text-sm">
       <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-5 py-3">BIB</th><th class="px-5 py-3">Participant</th><th class="px-5 py-3">Judge</th><th class="px-5 py-3">Score</th><th class="px-5 py-3">Status</th><th class="px-5 py-3">Action</th></tr></thead>
       <tbody class="divide-y divide-slate-100">
-      ${state.scores.map(s=>{const p=state.participants.find(x=>x.id===s.participantId);return `<tr><td class="px-5 py-4 font-semibold">${p?.bib||"-"}</td><td class="px-5 py-4 font-medium">${p?.name||"-"}</td><td class="px-5 py-4">Judge 01</td><td class="px-5 py-4 font-bold">${scoreTotal(s)}</td><td class="px-5 py-4">${statusBadge("completed")}</td><td class="px-5 py-4"><button onclick="startJudging('${p?.id}')" class="font-semibold text-indigo-600">View</button></td></tr>`}).join("")}
+      ${state.scores.map(s=>{const p=state.participants.find(x=>x.id===s.participantId);return `<tr><td class="px-5 py-4 font-semibold">${p?.bib||"-"}</td><td class="px-5 py-4 font-medium">${p?.name||"-"}</td><td class="px-5 py-4">${s.judgeId || "-"}</td><td class="px-5 py-4 font-bold">${scoreTotal(s)}</td><td class="px-5 py-4">${statusBadge("completed")}</td><td class="px-5 py-4"><button onclick="startJudging('${p?.id}')" class="font-semibold text-indigo-600">View</button></td></tr>`}).join("")}
       </tbody></table></div></div>`;
 }
 
@@ -636,7 +717,7 @@ function login() {
     document.getElementById("app-view").classList.remove("hidden");
     renderNav();renderPage();
     showToast("Login successful.","success");
-    fetchParticipantsFromServer();
+    fetchParticipantsFromServer().then(() => fetchScoresFromServer());
   } else {
     showToast("Invalid Judge ID or PIN.","error");
   }
